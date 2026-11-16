@@ -103,6 +103,7 @@
           <div
             class="call-feedback"
             [class.feedback-success]="result.status === 'success'"
+            [class.feedback-unverified]="result.status === 'unverified'"
             [class.feedback-error]="result.status === 'error'"
             role="status"
             aria-live="polite"

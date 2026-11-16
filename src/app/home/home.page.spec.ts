@@ -29,6 +29,7 @@ describe('HomePage', () => {
 
   afterEach(() => {
     httpTesting.verify();
+    vi.unstubAllGlobals();
     TestBed.resetTestingModule();
   });
 
@@ -85,6 +86,20 @@ describe('HomePage', () => {
     await request;
 
     expect(component.requestState(link.id)?.status).toBe('success');
+  });
+
+  it('sends private HTTP links without CORS and reports the hidden response as unverified', async () => {
+    const link = { id: 'shelly', name: 'Shelly', url: 'http://192.168.10.171/rpc/Switch.Toggle?id=0' };
+    const opaqueResponse = new Response();
+    Object.defineProperty(opaqueResponse, 'type', { value: 'opaque' });
+    const fetchMock = vi.fn().mockResolvedValue(opaqueResponse);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await component.callLink(link);
+
+    expect(fetchMock).toHaveBeenCalledWith(link.url, expect.objectContaining({ method: 'GET', mode: 'no-cors' }));
+    expect(component.requestState(link.id)?.status).toBe('unverified');
+    expect(component.requestState(link.id)?.message).toContain('codice HTTP non è leggibile');
   });
 
   it('marks a non-2xx response as an error', async () => {
