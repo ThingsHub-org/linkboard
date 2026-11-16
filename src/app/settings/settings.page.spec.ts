@@ -26,6 +26,12 @@ describe('SettingsPage', () => {
     await vi.waitFor(() => expect(linkStore.isReady()).toBe(true));
   });
 
+  it('displays the application version from package metadata', () => {
+    expect(fixture.nativeElement.querySelector('.page-footer')?.textContent).toContain(
+      `Versione ${component.appVersion}`,
+    );
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

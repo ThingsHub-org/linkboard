@@ -14,6 +14,7 @@ import {
   trashOutline,
 } from 'ionicons/icons';
 
+import packageJson from '../../../package.json';
 import {
   MAX_BACKUP_SIZE_BYTES,
   LinkBackupService,
@@ -42,6 +43,7 @@ export class SettingsPage {
   readonly persistenceError = this.linkStore.persistenceError;
   readonly isLoadingLinks = this.linkStore.isLoading;
   readonly isReady = this.linkStore.isReady;
+  readonly appVersion = packageJson.version;
   readonly nfcSupported = this.nfc.isSupported;
   editingId: string | null = null;
   formName = '';
