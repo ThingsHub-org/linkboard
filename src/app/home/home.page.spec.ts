@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
+import { LinkNfcService } from '../link-nfc.service';
 import { LinkStore } from '../link.store';
 
 import { HomePage } from './home.page';
@@ -20,6 +21,9 @@ describe('HomePage', () => {
     await TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
+    const nfc = TestBed.inject(LinkNfcService);
+    vi.spyOn(nfc, 'isSupported', 'get').mockReturnValue(true);
+    vi.spyOn(nfc, 'startScanning').mockResolvedValue(vi.fn());
     fixture = TestBed.createComponent(HomePage);
     component = fixture.componentInstance;
     httpTesting = TestBed.inject(HttpTestingController);
@@ -29,12 +33,20 @@ describe('HomePage', () => {
 
   afterEach(() => {
     httpTesting.verify();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     TestBed.resetTestingModule();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('starts NFC scanning when the home page opens', async () => {
+    const nfc = TestBed.inject(LinkNfcService);
+
+    await vi.waitFor(() => expect(nfc.startScanning).toHaveBeenCalledOnce());
+    expect(component.isScanningNfc()).toBe(true);
   });
 
   it('filters links by name and hostname', () => {
@@ -86,6 +98,103 @@ describe('HomePage', () => {
     await request;
 
     expect(component.requestState(link.id)?.status).toBe('success');
+  });
+
+  it('highlights a link green when its NFC-triggered request succeeds', async () => {
+    const linkStore = TestBed.inject(LinkStore);
+    const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
+    linkStore.replaceAll([link]);
+    fixture.detectChanges();
+
+    const nfc = TestBed.inject(LinkNfcService);
+    const onLinkRead = vi.mocked(nfc.startScanning).mock.calls[0][0];
+    onLinkRead(link.id);
+    httpTesting.expectOne(link.url).flush('ok', { status: 200, statusText: 'OK' });
+
+    await vi.waitFor(() => expect(component.requestState(link.id)?.status).toBe('success'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.launcher-card.is-success')).not.toBeNull();
+  });
+
+  it('highlights a link red when its NFC-triggered request fails', async () => {
+    const linkStore = TestBed.inject(LinkStore);
+    const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
+    linkStore.replaceAll([link]);
+    fixture.detectChanges();
+
+    const nfc = TestBed.inject(LinkNfcService);
+    const onLinkRead = vi.mocked(nfc.startScanning).mock.calls[0][0];
+    onLinkRead(link.id);
+    httpTesting.expectOne(link.url).flush('unavailable', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+
+    await vi.waitFor(() => expect(component.requestState(link.id)?.status).toBe('error'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.launcher-card.is-error')).not.toBeNull();
+  });
+
+  it('clears successful and failed link highlights after five seconds', async () => {
+    vi.useFakeTimers();
+    const linkStore = TestBed.inject(LinkStore);
+    const successLink = { id: 'success', name: 'Success', url: 'https://success.example' };
+    const errorLink = { id: 'error', name: 'Error', url: 'https://error.example' };
+    linkStore.replaceAll([successLink, errorLink]);
+    fixture.detectChanges();
+
+    const successRequest = component.callLink(successLink);
+    httpTesting.expectOne(successLink.url).flush('ok', { status: 200, statusText: 'OK' });
+    await successRequest;
+    expect(component.requestState(successLink.id)?.status).toBe('success');
+
+    await vi.advanceTimersByTimeAsync(2500);
+    const errorRequest = component.callLink(errorLink);
+    httpTesting.expectOne(errorLink.url).flush('unavailable', {
+      status: 503,
+      statusText: 'Service Unavailable',
+    });
+    await errorRequest;
+
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(component.requestState(successLink.id)).toBeUndefined();
+    expect(component.requestState(errorLink.id)?.status).toBe('error');
+
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(component.requestState(errorLink.id)).toBeUndefined();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.launcher-card.is-success, .launcher-card.is-error')).toBeNull();
+  });
+
+  it('scrolls a highlighted link into view when it is outside the viewport', async () => {
+    const linkStore = TestBed.inject(LinkStore);
+    const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
+    linkStore.replaceAll([link]);
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('.launcher-card') as HTMLElement;
+    vi.spyOn(card, 'getBoundingClientRect').mockReturnValue({
+      top: window.innerHeight + 20,
+      bottom: window.innerHeight + 200,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 180,
+      x: 0,
+      y: window.innerHeight + 20,
+      toJSON: () => ({}),
+    });
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(card, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+
+    const request = component.callLink(link);
+    httpTesting.expectOne(link.url).flush('ok', { status: 200, statusText: 'OK' });
+    await request;
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
   });
 
   it('sends private HTTP links without CORS and reports the hidden response as unverified', async () => {

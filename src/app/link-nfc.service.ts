@@ -93,7 +93,7 @@ export class LinkNfcService {
     if (error instanceof Error) {
       switch (error.name) {
         case 'NotAllowedError':
-          return 'Consenti l’accesso NFC al browser e avvia di nuovo l’operazione.';
+          return 'Consenti l’accesso NFC al browser, poi tocca Avvia scansione NFC per riprovare.';
         case 'NotSupportedError':
           return 'NFC non è supportato da questo browser o da questo dispositivo.';
         case 'SecurityError':

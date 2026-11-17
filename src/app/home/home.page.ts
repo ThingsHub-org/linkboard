@@ -1,5 +1,7 @@
+import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
+import type { OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { IonContent, IonIcon } from '@ionic/angular';
@@ -25,14 +27,17 @@ interface CallState {
   message: string;
 }
 
+const callResultDisplayDurationMs = 5000;
+
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
   imports: [FormsModule, IonContent, IonIcon, RouterLink],
 })
-export class HomePage {
+export class HomePage implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly document = inject(DOCUMENT);
   private readonly linkStore = inject(LinkStore);
   private readonly nfc = inject(LinkNfcService);
   readonly links = this.linkStore.links;
@@ -43,6 +48,7 @@ export class HomePage {
   readonly nfcMessage = signal('');
   searchTerm = '';
   private readonly callStates = signal<Record<string, CallState>>({});
+  private readonly callResultTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private stopNfcScan: (() => void) | null = null;
 
   constructor() {
@@ -56,7 +62,14 @@ export class HomePage {
       searchOutline,
       settingsOutline,
     });
-    inject(DestroyRef).onDestroy(() => this.stopNfcScanner());
+    inject(DestroyRef).onDestroy(() => {
+      this.stopNfcScanner();
+      this.clearCallResultTimeouts();
+    });
+  }
+
+  ngOnInit(): void {
+    if (this.nfcSupported) void this.toggleNfcScan();
   }
 
   get filteredLinks(): SavedLink[] {
@@ -174,8 +187,10 @@ export class HomePage {
       this.nfcMessage.set('Scansione NFC interrotta.');
       return;
     }
+    if (this.isScanningNfc()) return;
 
     this.nfcMessage.set('');
+    this.isScanningNfc.set(true);
     try {
       this.stopNfcScan = await this.nfc.startScanning(
         (linkId) => {
@@ -197,7 +212,6 @@ export class HomePage {
           this.nfcMessage.set(this.nfc.errorMessage(error));
         },
       );
-      this.isScanningNfc.set(true);
       this.nfcMessage.set('Scansione attiva. Avvicina un tag associato.');
     } catch (error) {
       this.stopNfcScanner();
@@ -206,7 +220,47 @@ export class HomePage {
   }
 
   private setCallState(id: string, state: CallState): void {
+    const previousTimeout = this.callResultTimeouts.get(id);
+    if (previousTimeout) clearTimeout(previousTimeout);
+    this.callResultTimeouts.delete(id);
     this.callStates.update((current) => ({ ...current, [id]: state }));
+
+    if (state.status !== 'success' && state.status !== 'error') return;
+
+    this.scrollCallResultIntoView(id);
+    const timeoutId = setTimeout(() => {
+      if (this.callResultTimeouts.get(id) !== timeoutId) return;
+      this.callResultTimeouts.delete(id);
+      this.callStates.update((current) => {
+        if (!current[id]) return current;
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }, callResultDisplayDurationMs);
+    this.callResultTimeouts.set(id, timeoutId);
+  }
+
+  private clearCallResultTimeouts(): void {
+    for (const timeoutId of this.callResultTimeouts.values()) clearTimeout(timeoutId);
+    this.callResultTimeouts.clear();
+  }
+
+  private scrollCallResultIntoView(id: string): void {
+    const view = this.document.defaultView;
+    if (!view) return;
+
+    view.requestAnimationFrame(() => {
+      const card = Array.from(this.document.querySelectorAll<HTMLElement>('.launcher-card[data-link-id]')).find(
+        (element) => element.dataset['linkId'] === id,
+      );
+      if (!card) return;
+
+      const bounds = card.getBoundingClientRect();
+      if (bounds.top < 0 || bounds.bottom > view.innerHeight) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    });
   }
 
   private stopNfcScanner(): void {

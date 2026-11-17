@@ -6,7 +6,7 @@ Per chiamare un endpoint da un browser, il server remoto deve consentire la rich
 
 ## Avvio tramite NFC
 
-Su Android compatibile con Web NFC e Chrome, dalla pagina **Configurazione** puoi scrivere su uno o più tag NFC l'ID stabile di un endpoint. Puoi scrivere lo stesso link su più tag. Dalla home tocca **Avvia scansione NFC**, poi avvicina un tag: Linkboard risolve l'ID nella raccolta caricata, invia la richiesta GET e mostra il relativo esito.
+Su Android compatibile con Web NFC e Chrome, dalla pagina **Configurazione** puoi scrivere su uno o più tag NFC l'ID stabile di un endpoint. Puoi scrivere lo stesso link su più tag. Aprendo la home, Linkboard tenta di avviare automaticamente la scansione e la mantiene attiva mentre l'app resta in primo piano. Se il browser richiede un gesto esplicito o blocca l'avvio automatico, tocca **Avvia scansione NFC** e poi avvicina un tag: Linkboard risolve l'ID nella raccolta caricata, invia la richiesta GET e mostra il relativo esito.
 
 La scansione richiede HTTPS, NFC attivo e Linkboard aperta in primo piano; non funziona con l'app chiusa o in background. Il tag contiene l'ID del link, non l'URL né una mappatura salvata nel browser. Per usare un tag su un altro dispositivo, importa lì il backup contenente lo stesso link e ID. Eliminando il link, il tag non risolverà più un endpoint. La chiamata resta soggetta ai normali requisiti di rete, CORS e timeout.
 

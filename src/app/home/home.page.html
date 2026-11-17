@@ -55,7 +55,13 @@
       } @else if (filteredLinks.length > 0) {
       <div class="launcher-grid">
         @for (link of filteredLinks; track link.id; let index = $index) {
-        <article class="launcher-card" [style.--card-index]="index">
+        <article
+          class="launcher-card"
+          [class.is-success]="requestState(link.id)?.status === 'success'"
+          [class.is-error]="requestState(link.id)?.status === 'error'"
+          [attr.data-link-id]="link.id"
+          [style.--card-index]="index"
+        >
           <button
             class="launcher-button"
             type="button"

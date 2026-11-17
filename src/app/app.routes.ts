@@ -1,9 +1,11 @@
 import type { Routes } from '@angular/router';
 
+import { HomePage } from './home/home.page';
+
 export const routes: Routes = [
   {
     path: 'home',
-    loadComponent: () => import('./home/home.page').then((m) => m.HomePage),
+    component: HomePage,
   },
   {
     path: 'settings',
@@ -11,7 +13,7 @@ export const routes: Routes = [
   },
   {
     path: '',
-    loadComponent: () => import('./home/home.page').then((m) => m.HomePage),
+    component: HomePage,
     pathMatch: 'full',
   },
 ];

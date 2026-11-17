@@ -15,7 +15,7 @@ Associare un tag NFC a uno dei link configurati in Linkboard e, quando il telefo
 
 ## Vincoli della soluzione PWA
 
-La PWA può leggere tag NFC con Web NFC soltanto in condizioni supportate dal browser e dal dispositivo: in pratica Android con Chrome, pagina servita in HTTPS e app aperta in primo piano. L'utente deve avviare esplicitamente la scansione; la scansione non continua quando la PWA è chiusa o in background. Web NFC non è una soluzione affidabile per avviare automaticamente una chiamata mentre il telefono è bloccato.
+La PWA può leggere tag NFC con Web NFC soltanto in condizioni supportate dal browser e dal dispositivo: in pratica Android con Chrome, pagina servita in HTTPS e app aperta in primo piano. Linkboard tenta l'avvio automatico entrando nella home, ma il browser può richiedere un gesto esplicito: in quel caso l'utente deve toccare il pulsante di scansione. La scansione non continua quando la PWA è chiusa o in background. Web NFC non è una soluzione affidabile per avviare automaticamente una chiamata mentre il telefono è bloccato.
 
 Se il requisito è avvicinare il telefono e lanciare la chiamata anche con Linkboard chiusa o in background, occorre valutare un'app Android nativa/Capacitor e la gestione degli intent NFC. È un percorso più ampio e va verificato sui dispositivi target; non va dato per scontato che Android consenta l'esecuzione silenziosa della richiesta in ogni stato.
 
