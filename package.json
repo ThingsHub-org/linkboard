@@ -1,6 +1,6 @@
 {
   "name": "url-shelf",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "author": "Ionic Framework",
   "homepage": "https://ionicframework.com/",
   "scripts": {
@@ -8,6 +8,8 @@
     "start": "ng serve --host 0.0.0.0",
     "start:pwa": "ng serve --configuration production --host 0.0.0.0",
     "build": "ng build",
+    "prebuild": "npm run version:bump",
+    "version:bump": "node scripts/bump-version.js",
     "watch": "ng build --watch --configuration development",
     "lint": "npm run eslint && npm run typecheck:e2e && npm run prettier -- --check",
     "lint:fix": "npm run eslint -- --fix && npm run prettier -- --write",
