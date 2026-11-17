@@ -225,6 +225,7 @@ export class HomePage implements OnInit {
     this.callResultTimeouts.delete(id);
     this.callStates.update((current) => ({ ...current, [id]: state }));
 
+    if (state.status === 'loading') this.scrollCallResultIntoView(id);
     if (state.status !== 'success' && state.status !== 'error') return;
 
     this.scrollCallResultIntoView(id);

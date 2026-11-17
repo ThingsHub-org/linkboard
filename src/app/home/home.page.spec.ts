@@ -100,6 +100,23 @@ describe('HomePage', () => {
     expect(component.requestState(link.id)?.status).toBe('success');
   });
 
+  it('highlights a tapped link yellow while its request is in progress', async () => {
+    const linkStore = TestBed.inject(LinkStore);
+    const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
+    linkStore.replaceAll([link]);
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('.launcher-button').click();
+    fixture.detectChanges();
+
+    expect(component.requestState(link.id)?.status).toBe('loading');
+    expect(fixture.nativeElement.querySelector('.launcher-card.is-loading')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.launcher-button.is-loading')).not.toBeNull();
+
+    httpTesting.expectOne(link.url).flush('ok', { status: 200, statusText: 'OK' });
+    await vi.waitFor(() => expect(component.requestState(link.id)?.status).toBe('success'));
+  });
+
   it('highlights a link green when its NFC-triggered request succeeds', async () => {
     const linkStore = TestBed.inject(LinkStore);
     const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
@@ -109,6 +126,11 @@ describe('HomePage', () => {
     const nfc = TestBed.inject(LinkNfcService);
     const onLinkRead = vi.mocked(nfc.startScanning).mock.calls[0][0];
     onLinkRead(link.id);
+    fixture.detectChanges();
+
+    expect(component.requestState(link.id)?.status).toBe('loading');
+    expect(fixture.nativeElement.querySelector('.launcher-card.is-loading')).not.toBeNull();
+
     httpTesting.expectOne(link.url).flush('ok', { status: 200, statusText: 'OK' });
 
     await vi.waitFor(() => expect(component.requestState(link.id)?.status).toBe('success'));

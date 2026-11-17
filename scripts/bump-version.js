@@ -9,6 +9,56 @@ function versionAt(commit) {
   return JSON.parse(git('show', `${commit}:package.json`)).version;
 }
 
+function changedFiles(...args) {
+  return execFileSync('git', args, { encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean);
+}
+
+function normalizedPackageFile(file, content) {
+  const json = JSON.parse(content);
+  delete json.version;
+
+  if (file === 'package.json') {
+    delete json.scripts.prebuild;
+    delete json.scripts['version:bump'];
+  } else {
+    delete json.packages[''].version;
+  }
+
+  return JSON.stringify(json);
+}
+
+function hasLocalChanges() {
+  const files = new Set([
+    ...changedFiles('diff', 'HEAD', '--name-only', '-z'),
+    ...changedFiles('ls-files', '--others', '--exclude-standard', '-z'),
+  ]);
+
+  for (const file of files) {
+    if (file === 'scripts/bump-version.js') {
+      continue;
+    }
+
+    if (file === 'package.json' || file === 'package-lock.json') {
+      if (!fs.existsSync(file)) {
+        return true;
+      }
+
+      const committed = git('show', `HEAD:${file}`);
+      const working = fs.readFileSync(file, 'utf8');
+      if (normalizedPackageFile(file, committed) !== normalizedPackageFile(file, working)) {
+        return true;
+      }
+      continue;
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 function latestVersionCommit(commits) {
   for (const commit of commits) {
     const revision = git('rev-list', '--parents', '-n', '1', commit).split(' ');
@@ -25,14 +75,14 @@ function latestVersionCommit(commits) {
   return commits.at(-1);
 }
 
-function nextVersion(version, messages) {
+function nextVersion(version, messages, hasUncommittedChanges) {
   const match = version.match(/^(\d+)\.(\d+)\.(\d+)$/);
   if (!match) {
     throw new Error(`Unsupported package version: ${version}`);
   }
 
   let [major, minor, patch] = match.slice(1).map(Number);
-  let bump = 'none';
+  let bump = hasUncommittedChanges ? 'patch' : 'none';
 
   for (const message of messages) {
     const [header, ...body] = message.split('\n');
@@ -85,7 +135,7 @@ const baselineVersion = versionAt(baseline);
 const messages = git('log', '--format=%B%x00', `${baseline}..HEAD`)
   .split('\0')
   .filter(Boolean);
-const version = nextVersion(baselineVersion, messages);
+const version = nextVersion(baselineVersion, messages, hasLocalChanges());
 
 const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const packageLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));

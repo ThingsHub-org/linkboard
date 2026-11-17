@@ -141,6 +141,7 @@ h2 { margin-bottom: 0; font-family: Georgia, "Times New Roman", serif; font-size
 .launcher-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 26px; }
 .launcher-toolbar { justify-content: flex-end; margin-bottom: 20px; }
 .launcher-card { min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background: white; animation: rise-in 360ms both; animation-delay: calc(var(--card-index, 0) * 55ms); transition: border-color 180ms ease, background 180ms ease; }
+.launcher-card.is-loading { border-color: #d6b32c; background: #fffbe3; }
 .launcher-card.is-success { border-color: #64a779; background: #eef8ef; }
 .launcher-card.is-error { border-color: #cc7769; background: #fff0ed; }
 .launcher-button { width: 100%; min-height: 218px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 22px 14px; border: 0; color: var(--ink); background: transparent; cursor: pointer; transition: background 160ms ease, transform 160ms ease; }
@@ -150,12 +151,14 @@ h2 { margin-bottom: 0; font-family: Georgia, "Times New Roman", serif; font-size
 .launcher-icon.has-photo { overflow: hidden; color: transparent; background: #e5f1e7; }
 .launcher-icon img { width: 100%; height: 100%; object-fit: cover; }
 .launcher-button:hover .launcher-icon { transform: scale(1.05); }
+.launcher-button.is-loading .launcher-icon { color: #806600; background: #fff0a8; }
 .launcher-button.is-success .launcher-icon { color: #17643b; background: #d7f0dd; }
 .launcher-button.is-error .launcher-icon { color: #a33e2d; background: #fbe1dc; }
 .launcher-button .link-name { max-width: 100%; font-size: 16px; }
 .launcher-button .link-host { max-width: 100%; margin-top: 0; }
 .call-feedback { min-height: 36px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border-top: 1px solid var(--line); color: var(--muted); background: #fafbf9; font-size: 11px; text-align: center; }
 .call-feedback ion-icon { flex: 0 0 auto; font-size: 15px; }
+.call-feedback.feedback-loading { color: #806600; background: #fffbe3; }
 .call-feedback.feedback-success { color: #17643b; background: #eef8ef; }
 .call-feedback.feedback-error { color: #a33e2d; background: #fff0ed; }
 .launcher-grid + .empty-state { margin-top: 20px; }
