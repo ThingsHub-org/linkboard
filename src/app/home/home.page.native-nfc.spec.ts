@@ -40,11 +40,13 @@ describe('HomePage native NFC launch', () => {
 
   afterEach(() => {
     httpTesting.verify();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     TestBed.resetTestingModule();
   });
 
   it('calls the configured link when Android dispatches its NFC tag intent', async () => {
+    vi.useFakeTimers();
     const link = { id: 'nfc-link', name: 'Door', url: 'https://example.com/open' };
     TestBed.inject(LinkStore).replaceAll([link]);
     fixture.detectChanges();
@@ -55,7 +57,14 @@ describe('HomePage native NFC launch', () => {
     expect(request.request.method).toBe('GET');
     request.flush('opened', { status: 200, statusText: 'OK' });
 
-    await vi.waitFor(() => expect(fixture.componentInstance.requestState(link.id)?.status).toBe('success'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fixture.componentInstance.requestState(link.id)?.status).toBe('success');
     expect(fixture.componentInstance.nfcMessage()).toContain('chiamata riuscita');
+
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(fixture.componentInstance.nfcMessage()).toContain('chiamata riuscita');
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fixture.componentInstance.nfcMessage()).toBe('Avvicina un altro tag NFC associato per una nuova scansione.');
   });
 });

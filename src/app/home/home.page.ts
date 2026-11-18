@@ -59,6 +59,7 @@ export class HomePage implements OnInit {
   searchTerm = '';
   private readonly callStates = signal<Record<string, CallState>>({});
   private readonly callResultTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private nfcMessageTimeout: ReturnType<typeof setTimeout> | null = null;
   private stopNfcScan: (() => void) | null = null;
   private stopNativeNfc: (() => void) | null = null;
 
@@ -77,6 +78,7 @@ export class HomePage implements OnInit {
       this.stopNfcScanner();
       this.stopNativeNfc?.();
       this.clearCallResultTimeouts();
+      this.clearNfcMessageTimeout();
     });
   }
 
@@ -200,42 +202,42 @@ export class HomePage implements OnInit {
   async toggleNfcScan(): Promise<void> {
     if (this.stopNfcScan) {
       this.stopNfcScanner();
-      this.nfcMessage.set('Scansione NFC interrotta.');
+      this.setNfcMessage('Scansione NFC interrotta.');
       return;
     }
     if (this.isScanningNfc()) return;
 
-    this.nfcMessage.set('');
+    this.setNfcMessage('');
     this.isScanningNfc.set(true);
     try {
       this.stopNfcScan = await this.nfc.startScanning(
         (linkId) => void this.handleNfcLinkId(linkId),
-        () => this.nfcMessage.set('Tag NFC non associato a un link di Linkboard.'),
+        () => this.setNfcMessage('Tag NFC non associato a un link di Linkboard.'),
         (error) => {
           this.stopNfcScanner();
-          this.nfcMessage.set(this.nfc.errorMessage(error));
+          this.setNfcMessage(this.nfc.errorMessage(error));
         },
       );
-      this.nfcMessage.set('Scansione attiva. Avvicina un tag associato.');
+      this.setNfcMessage('Scansione attiva. Avvicina un tag associato.');
     } catch (error) {
       this.stopNfcScanner();
-      this.nfcMessage.set(this.nfc.errorMessage(error));
+      this.setNfcMessage(this.nfc.errorMessage(error));
     }
   }
 
   private async startNativeNfcListener(): Promise<void> {
     const waitingMessage = 'In attesa di tag NFC...';
-    this.nfcMessage.set(waitingMessage);
+    this.setNfcMessage(waitingMessage);
     try {
       this.stopNativeNfc = await this.nativeNfc.listenForTags((linkId) => void this.handleNfcLinkId(linkId));
       const available = await this.nativeNfc.isAvailable();
       if (this.nfcMessage() === waitingMessage) {
-        this.nfcMessage.set(
+        this.setNfcMessage(
           available ? 'Avvicina un tag NFC associato per avviare la chiamata.' : 'NFC non disponibile o disattivato.',
         );
       }
     } catch (error) {
-      this.nfcMessage.set(error instanceof Error ? error.message : 'Impossibile inizializzare la scansione NFC.');
+      this.setNfcMessage(error instanceof Error ? error.message : 'Impossibile inizializzare la scansione NFC.');
     }
   }
 
@@ -243,14 +245,30 @@ export class HomePage implements OnInit {
     if (this.isLoadingLinks()) await this.linksLoaded;
     const link = this.links().find((item) => item.id === linkId);
     if (!link) {
-      this.nfcMessage.set('Il link associato al tag non è più configurato.');
+      this.setNfcMessage('Il link associato al tag non è più configurato.');
       return;
     }
 
-    this.nfcMessage.set(`Tag letto: avvio la chiamata per ${link.name}.`);
+    this.setNfcMessage(`Tag letto: avvio la chiamata per ${link.name}.`);
     await this.callLink(link);
     const result = this.requestState(link.id);
-    if (result) this.nfcMessage.set(`Tag letto: ${result.message}`);
+    if (result) this.setNfcMessage(`Tag letto: ${result.message}`, result.status !== 'loading');
+  }
+
+  private setNfcMessage(message: string, promptForNextScan = false): void {
+    this.clearNfcMessageTimeout();
+    this.nfcMessage.set(message);
+    if (!promptForNextScan) return;
+
+    this.nfcMessageTimeout = setTimeout(() => {
+      this.nfcMessageTimeout = null;
+      this.nfcMessage.set('Avvicina un altro tag NFC associato per una nuova scansione.');
+    }, callResultDisplayDurationMs);
+  }
+
+  private clearNfcMessageTimeout(): void {
+    if (this.nfcMessageTimeout) clearTimeout(this.nfcMessageTimeout);
+    this.nfcMessageTimeout = null;
   }
 
   private setCallState(id: string, state: CallState): void {
