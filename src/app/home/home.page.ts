@@ -2,6 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { IonContent, IonIcon } from '@ionic/angular';
@@ -16,11 +17,12 @@ import {
   searchOutline,
   settingsOutline,
 } from 'ionicons/icons';
-import { firstValueFrom, TimeoutError, timeout } from 'rxjs';
+import { filter, firstValueFrom, take, TimeoutError, timeout } from 'rxjs';
 
 import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
 import { LinkStore } from '../link.store';
+import { NativeNfcLaunchService } from '../native-nfc-launch.service';
 
 interface CallState {
   status: 'loading' | 'success' | 'unverified' | 'error';
@@ -40,16 +42,25 @@ export class HomePage implements OnInit {
   private readonly document = inject(DOCUMENT);
   private readonly linkStore = inject(LinkStore);
   private readonly nfc = inject(LinkNfcService);
+  private readonly nativeNfc = inject(NativeNfcLaunchService);
+  private readonly linksLoaded = firstValueFrom(
+    toObservable(this.linkStore.isLoading).pipe(
+      filter((isLoading) => !isLoading),
+      take(1),
+    ),
+  );
   readonly links = this.linkStore.links;
   readonly persistenceError = this.linkStore.persistenceError;
   readonly isLoadingLinks = this.linkStore.isLoading;
   readonly nfcSupported = this.nfc.isSupported;
+  readonly isNativeNfcApp = this.nativeNfc.isAndroidApp;
   readonly isScanningNfc = signal(false);
   readonly nfcMessage = signal('');
   searchTerm = '';
   private readonly callStates = signal<Record<string, CallState>>({});
   private readonly callResultTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private stopNfcScan: (() => void) | null = null;
+  private stopNativeNfc: (() => void) | null = null;
 
   constructor() {
     addIcons({
@@ -64,11 +75,16 @@ export class HomePage implements OnInit {
     });
     inject(DestroyRef).onDestroy(() => {
       this.stopNfcScanner();
+      this.stopNativeNfc?.();
       this.clearCallResultTimeouts();
     });
   }
 
   ngOnInit(): void {
+    if (this.nativeNfc.isAndroidApp) {
+      void this.startNativeNfcListener();
+      return;
+    }
     if (this.nfcSupported) void this.toggleNfcScan();
   }
 
@@ -193,19 +209,7 @@ export class HomePage implements OnInit {
     this.isScanningNfc.set(true);
     try {
       this.stopNfcScan = await this.nfc.startScanning(
-        (linkId) => {
-          const link = this.links().find((item) => item.id === linkId);
-          if (!link) {
-            this.nfcMessage.set('Il link associato al tag non è più configurato.');
-            return;
-          }
-
-          this.nfcMessage.set(`Tag letto: avvio la chiamata per ${link.name}.`);
-          void this.callLink(link).then(() => {
-            const result = this.requestState(link.id);
-            if (result) this.nfcMessage.set(`Tag letto: ${result.message}`);
-          });
-        },
+        (linkId) => void this.handleNfcLinkId(linkId),
         () => this.nfcMessage.set('Tag NFC non associato a un link di Linkboard.'),
         (error) => {
           this.stopNfcScanner();
@@ -217,6 +221,36 @@ export class HomePage implements OnInit {
       this.stopNfcScanner();
       this.nfcMessage.set(this.nfc.errorMessage(error));
     }
+  }
+
+  private async startNativeNfcListener(): Promise<void> {
+    const waitingMessage = 'In attesa di tag NFC...';
+    this.nfcMessage.set(waitingMessage);
+    try {
+      this.stopNativeNfc = await this.nativeNfc.listenForTags((linkId) => void this.handleNfcLinkId(linkId));
+      const available = await this.nativeNfc.isAvailable();
+      if (this.nfcMessage() === waitingMessage) {
+        this.nfcMessage.set(
+          available ? 'Avvicina un tag NFC associato per avviare la chiamata.' : 'NFC non disponibile o disattivato.',
+        );
+      }
+    } catch (error) {
+      this.nfcMessage.set(error instanceof Error ? error.message : 'Impossibile inizializzare la scansione NFC.');
+    }
+  }
+
+  private async handleNfcLinkId(linkId: string): Promise<void> {
+    if (this.isLoadingLinks()) await this.linksLoaded;
+    const link = this.links().find((item) => item.id === linkId);
+    if (!link) {
+      this.nfcMessage.set('Il link associato al tag non è più configurato.');
+      return;
+    }
+
+    this.nfcMessage.set(`Tag letto: avvio la chiamata per ${link.name}.`);
+    await this.callLink(link);
+    const result = this.requestState(link.id);
+    if (result) this.nfcMessage.set(`Tag letto: ${result.message}`);
   }
 
   private setCallState(id: string, state: CallState): void {
