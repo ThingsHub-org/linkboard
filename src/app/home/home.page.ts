@@ -60,6 +60,7 @@ export class HomePage implements OnInit {
   private readonly callStates = signal<Record<string, CallState>>({});
   private readonly callResultTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
   private nfcMessageTimeout: ReturnType<typeof setTimeout> | null = null;
+  private nfcRequestSequence = 0;
   private stopNfcScan: (() => void) | null = null;
   private stopNativeNfc: (() => void) | null = null;
 
@@ -156,10 +157,7 @@ export class HomePage implements OnInit {
     });
 
     try {
-      const response = await Promise.race([
-        this.nativeNfc.httpGet(link.url, timeoutMs),
-        timeoutPromise,
-      ]);
+      const response = await Promise.race([this.nativeNfc.httpGet(link.url, timeoutMs), timeoutPromise]);
       const succeeded = response.status >= 200 && response.status < 300;
       this.setCallState(link.id, {
         status: succeeded ? 'success' : 'error',
@@ -287,6 +285,7 @@ export class HomePage implements OnInit {
 
   private async handleNfcLinkId(linkId: string): Promise<void> {
     if (this.isLoadingLinks()) await this.linksLoaded;
+    const requestSequence = ++this.nfcRequestSequence;
     const link = this.links().find((item) => item.id === linkId);
     if (!link) {
       this.setNfcMessage('Il link associato al tag non è più configurato.');
@@ -295,6 +294,7 @@ export class HomePage implements OnInit {
 
     this.setNfcMessage(`Tag letto: avvio la chiamata per ${link.name}.`);
     await this.callLink(link);
+    if (requestSequence !== this.nfcRequestSequence) return;
     const result = this.requestState(link.id);
     if (result) this.setNfcMessage(`Tag letto: ${result.message}`, result.status !== 'loading');
   }

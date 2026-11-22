@@ -71,6 +71,31 @@ describe('HomePage native NFC launch', () => {
     expect(fixture.componentInstance.nfcMessage()).toBe('Avvicina un altro tag NFC associato per una nuova scansione.');
   });
 
+  it('keeps separate link results when native NFC calls complete in different order', async () => {
+    let resolveFirst!: (value: { status: number }) => void;
+    const firstResponse = new Promise<{ status: number }>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    vi.spyOn(nativeNfc, 'httpGet').mockImplementation((url) =>
+      url.includes('/first') ? firstResponse : Promise.resolve({ status: 200 }),
+    );
+    const first = { id: 'first', name: 'First', url: 'https://example.com/first' };
+    const second = { id: 'second', name: 'Second', url: 'https://example.com/second' };
+    TestBed.inject(LinkStore).replaceAll([first, second]);
+    fixture.detectChanges();
+
+    onTagDetected?.(first.id);
+    onTagDetected?.(second.id);
+    await vi.waitFor(() => expect(fixture.componentInstance.requestState(second.id)?.status).toBe('success'));
+
+    resolveFirst({ status: 504 });
+    await vi.waitFor(() => expect(fixture.componentInstance.requestState(first.id)?.status).toBe('error'));
+
+    expect(fixture.componentInstance.requestState(second.id)?.status).toBe('success');
+    expect(fixture.componentInstance.nfcMessage()).toContain('chiamata riuscita');
+  });
+
   it('reports a native HTTP 504 response', async () => {
     const nativeNfc = TestBed.inject(NativeNfcLaunchService);
     vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
