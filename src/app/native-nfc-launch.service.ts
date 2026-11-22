@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 
 interface NfcTagEvent {
@@ -19,6 +19,16 @@ const NativeNfc = registerPlugin<NativeNfcPlugin>('NfcLaunch');
 export class NativeNfcLaunchService {
   get isAndroidApp(): boolean {
     return Capacitor.getPlatform() === 'android';
+  }
+
+  async httpGet(url: string, timeoutMs: number): Promise<{ status: number }> {
+    if (!this.isAndroidApp) throw new Error('Le chiamate native HTTP sono disponibili solo nell’app Android.');
+    return CapacitorHttp.get({
+      url,
+      responseType: 'text',
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs,
+    });
   }
 
   async isAvailable(): Promise<boolean> {

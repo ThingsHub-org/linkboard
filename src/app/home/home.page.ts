@@ -118,6 +118,10 @@ export class HomePage implements OnInit {
   async callLink(link: SavedLink, timeoutMs = 15000): Promise<void> {
     if (this.callStates()[link.id]?.status === 'loading') return;
     this.setCallState(link.id, { status: 'loading', message: 'Invio richiesta GET...' });
+    if (this.isNativeAndroidApp) {
+      await this.callNativeHttpLink(link, timeoutMs);
+      return;
+    }
     if (this.isPrivateHttpUrl(link.url)) {
       await this.callPrivateHttpLink(link, timeoutMs);
       return;
@@ -143,6 +147,46 @@ export class HomePage implements OnInit {
           : 'Richiesta bloccata o non raggiungibile: verifica rete e CORS.';
       this.setCallState(link.id, { status: 'error', message });
     }
+  }
+
+  private async callNativeHttpLink(link: SavedLink, timeoutMs: number): Promise<void> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new TimeoutError()), timeoutMs);
+    });
+
+    try {
+      const response = await Promise.race([
+        this.nativeNfc.httpGet(link.url, timeoutMs),
+        timeoutPromise,
+      ]);
+      const succeeded = response.status >= 200 && response.status < 300;
+      this.setCallState(link.id, {
+        status: succeeded ? 'success' : 'error',
+        message: succeeded
+          ? `Risposta HTTP ${response.status}: chiamata riuscita.`
+          : `Risposta HTTP ${response.status}.`,
+      });
+    } catch (error) {
+      const status =
+        typeof error === 'object' && error !== null && 'status' in error
+          ? Number((error as { status?: unknown }).status)
+          : 0;
+      this.setCallState(link.id, {
+        status: 'error',
+        message: status
+          ? `Chiamata non riuscita: HTTP ${status}.`
+          : error instanceof TimeoutError
+            ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
+            : 'Richiesta bloccata o non raggiungibile: verifica rete e configurazione Android.',
+      });
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
+
+  private get isNativeAndroidApp(): boolean {
+    return this.nativeNfc.isAndroidApp;
   }
 
   private async callPrivateHttpLink(link: SavedLink, timeoutMs: number): Promise<void> {

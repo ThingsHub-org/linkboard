@@ -47,24 +47,40 @@ describe('HomePage native NFC launch', () => {
 
   it('calls the configured link when Android dispatches its NFC tag intent', async () => {
     vi.useFakeTimers();
+    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const getMock = vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
+      status: 200,
+    });
     const link = { id: 'nfc-link', name: 'Door', url: 'https://example.com/open' };
     TestBed.inject(LinkStore).replaceAll([link]);
     fixture.detectChanges();
 
     onTagDetected?.(link.id);
     await vi.waitFor(() => expect(fixture.componentInstance.requestState(link.id)?.status).toBe('loading'));
-    const request = httpTesting.expectOne(link.url);
-    expect(request.request.method).toBe('GET');
-    request.flush('opened', { status: 200, statusText: 'OK' });
+    expect(getMock).toHaveBeenCalledWith(link.url, 15000);
 
     await Promise.resolve();
     await Promise.resolve();
     expect(fixture.componentInstance.requestState(link.id)?.status).toBe('success');
+    await vi.advanceTimersByTimeAsync(0);
     expect(fixture.componentInstance.nfcMessage()).toContain('chiamata riuscita');
 
     await vi.advanceTimersByTimeAsync(4999);
     expect(fixture.componentInstance.nfcMessage()).toContain('chiamata riuscita');
     await vi.advanceTimersByTimeAsync(1);
     expect(fixture.componentInstance.nfcMessage()).toBe('Avvicina un altro tag NFC associato per una nuova scansione.');
+  });
+
+  it('reports a native HTTP 504 response', async () => {
+    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
+      status: 504,
+    });
+    const link = { id: 'nfc-link', name: 'Door', url: 'https://example.com/open' };
+
+    await fixture.componentInstance.callLink(link);
+
+    expect(fixture.componentInstance.requestState(link.id)?.status).toBe('error');
+    expect(fixture.componentInstance.requestState(link.id)?.message).toContain('504');
   });
 });

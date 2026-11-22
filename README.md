@@ -88,3 +88,32 @@ I file pronti per la distribuzione vengono generati in `www/`. Il service worker
 ## App nativa con Capacitor
 
 Capacitor è già configurato. Per generare una piattaforma mobile servono l’SDK Android o Xcode e il relativo pacchetto Capacitor; la PWA non richiede questi strumenti.
+
+### Costruire l’APK Android
+
+1. Installa le dipendenze e compila e sincronizza la web app nel progetto Android:
+
+```bash
+npm install
+npm run android:build
+```
+
+Il comando `npm run android:build` prepara automaticamente la directory `www/` con la build production e sincronizza il contenuto nel progetto `android/`; non è necessario eseguire separatamente `npm run build`.
+
+2. Genera l’APK di debug dal progetto Android:
+
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+L’APK viene creato in `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Per generare una build Android release non firmata:
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+L’APK viene creato in `android/app/build/outputs/apk/release/app-release-unsigned.apk`. Per distribuire questa build su dispositivi o tramite store, apri il progetto in Android Studio e configuralo con una chiave di firma valida tramite **Build > Generate Signed Bundle / APK**.
