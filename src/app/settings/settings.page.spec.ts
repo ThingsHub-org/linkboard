@@ -6,6 +6,7 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { vi } from 'vitest';
 
+import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import { LinkNfcService } from '../link-nfc.service';
 import { LinkStore } from '../link.store';
 
@@ -41,6 +42,20 @@ describe('SettingsPage', () => {
     expect(fixture.nativeElement.querySelector('.page-footer')?.textContent).toContain(
       `Versione ${component.appVersion}`,
     );
+  });
+
+  it('defaults detailed diagnostics to enabled and persists the setting across app starts', () => {
+    const checkbox = fixture.nativeElement.querySelector('[name="detailedDiagnostics"]') as HTMLInputElement;
+
+    expect(checkbox.checked).toBe(true);
+    checkbox.click();
+    fixture.detectChanges();
+
+    expect(component.detailedDiagnosticsEnabled()).toBe(false);
+    expect(localStorage.getItem('linkboard.detailedDiagnosticsEnabled')).toBe('false');
+
+    TestBed.resetTestingModule();
+    expect(TestBed.inject(DetailedDiagnosticsSettingsService).enabled()).toBe(false);
   });
 
   it('creates and shares a backup file on Android', async () => {

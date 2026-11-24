@@ -125,7 +125,17 @@
             }
             <span>{{ result.message }}</span>
           </div>
-          }
+          @if (result.diagnostics && detailedDiagnosticsEnabled()) {
+          <section class="request-diagnostics" aria-label="Diagnostica dettagliata della chiamata">
+            <pre>{{ result.diagnostics }}</pre>
+            <button class="secondary-button" type="button" (click)="copyDiagnostics(link.id, result.diagnostics)">
+              Copia diagnostica
+            </button>
+            @if (result.copyMessage) {
+            <span role="status" aria-live="polite">{{ result.copyMessage }}</span>
+            }
+          </section>
+          } }
         </article>
         }
       </div>

@@ -16,6 +16,8 @@ interface NativeNfcPlugin {
 export interface NativeHttpResponse {
   status: number;
   data: unknown;
+  headers: Record<string, string>;
+  url: string;
 }
 
 const NativeNfc = registerPlugin<NativeNfcPlugin>('NfcLaunch');
@@ -26,7 +28,7 @@ export class NativeNfcLaunchService {
     return Capacitor.getPlatform() === 'android';
   }
 
-  async httpGet(url: string, timeoutMs: number): Promise<{ status: number }> {
+  async httpGet(url: string, timeoutMs: number): Promise<NativeHttpResponse> {
     if (!this.isAndroidApp) throw new Error('Le chiamate native HTTP sono disponibili solo nell’app Android.');
     return CapacitorHttp.get({
       url,

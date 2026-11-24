@@ -5,9 +5,11 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
+import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import { LinkNfcService } from '../link-nfc.service';
 import { LinkStore } from '../link.store';
-import { TuyaService } from '../tuya.service';
+import { NativeNfcLaunchService } from '../native-nfc-launch.service';
+import { TuyaRequestError, TuyaService } from '../tuya.service';
 
 import { HomePage } from './home.page';
 
@@ -15,10 +17,12 @@ describe('HomePage', () => {
   let component: HomePage;
   let fixture: ComponentFixture<HomePage>;
   let httpTesting: HttpTestingController;
+  let originalClipboard: PropertyDescriptor | undefined;
 
   beforeEach(async () => {
     TestBed.resetTestingModule();
     localStorage.clear();
+    originalClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     await TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
@@ -36,6 +40,11 @@ describe('HomePage', () => {
     httpTesting.verify();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    if (originalClipboard) {
+      Object.defineProperty(navigator, 'clipboard', originalClipboard);
+    } else {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
     TestBed.resetTestingModule();
   });
 
@@ -101,6 +110,64 @@ describe('HomePage', () => {
     expect(component.requestState(link.id)?.status).toBe('success');
   });
 
+  it('shows and copies detailed diagnostics for a normal GET request', async () => {
+    const link = { id: 'api', name: 'API', url: 'https://api.example.com/status' };
+    TestBed.inject(LinkStore).replaceAll([link]);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    fixture.detectChanges();
+    const request = component.callLink(link);
+    httpTesting.expectOne(link.url).flush('service response', {
+      status: 200,
+      statusText: 'OK',
+      headers: { 'x-trace-id': 'normal-get-id' },
+    });
+    await request;
+    fixture.detectChanges();
+
+    const diagnostics = fixture.nativeElement.querySelector('.request-diagnostics pre').textContent;
+    const exchange = JSON.parse(diagnostics).exchanges[0];
+    expect(exchange.request).toMatchObject({
+      method: 'GET',
+      url: link.url,
+      headers: {},
+    });
+    expect(exchange.response).toMatchObject({
+      status: 200,
+      headers: { 'x-trace-id': 'normal-get-id' },
+      body: 'service response',
+    });
+
+    fixture.nativeElement.querySelector('.request-diagnostics button').click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(diagnostics));
+  });
+
+  it('shows Android HTTP response headers and body in detailed diagnostics', async () => {
+    const link = { id: 'native', name: 'Native', url: 'https://api.example.com/status' };
+    TestBed.inject(LinkStore).replaceAll([link]);
+    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    vi.spyOn(nativeNfc, 'isAndroidApp', 'get').mockReturnValue(true);
+    vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
+      status: 200,
+      data: 'android response',
+      headers: { 'x-trace-id': 'android-get-id' },
+      url: link.url,
+    });
+    fixture.detectChanges();
+
+    await component.callLink(link);
+    fixture.detectChanges();
+
+    const exchange = JSON.parse(fixture.nativeElement.querySelector('.request-diagnostics pre').textContent)
+      .exchanges[0];
+    expect(exchange.response).toMatchObject({
+      status: 200,
+      url: link.url,
+      headers: { 'x-trace-id': 'android-get-id' },
+      body: 'android response',
+    });
+  });
+
   it('routes Tuya links through the Tuya service and avoids claiming physical state', async () => {
     const link = {
       id: 'tuya-link',
@@ -115,7 +182,7 @@ describe('HomePage', () => {
         body: '{"commands":[]}',
       },
     };
-    const execute = vi.spyOn(TestBed.inject(TuyaService), 'execute').mockResolvedValue();
+    const execute = vi.spyOn(TestBed.inject(TuyaService), 'execute').mockResolvedValue(undefined);
 
     await component.callLink(link);
 
@@ -124,6 +191,60 @@ describe('HomePage', () => {
       status: 'success',
       message: expect.stringContaining('stato fisico del dispositivo non è verificato'),
     });
+  });
+
+  it('shows and copies full Tuya diagnostics when Tuya rejects a command', async () => {
+    const command = '{"commands":[{"code":"switch_1","value":true}]}';
+    const link = {
+      id: 'tuya-link',
+      name: 'Lampada',
+      url: 'https://openapi.tuyaeu.com',
+      type: 'tuya' as const,
+      tuya: {
+        region: 'eu' as const,
+        deviceId: 'device-123',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        body: command,
+      },
+    };
+    TestBed.inject(LinkStore).replaceAll([link]);
+    vi.spyOn(TestBed.inject(TuyaService), 'execute').mockRejectedValue(
+      new TuyaRequestError('Tuya ha rifiutato il comando.', undefined, command, [
+        {
+          request: {
+            method: 'POST',
+            url: 'https://openapi.tuyaeu.com/v1.0/iot-03/devices/device-123/commands',
+            headers: { client_id: 'client-id', sign: 'signature', access_token: 'token' },
+            body: command,
+          },
+          response: {
+            status: 200,
+            headers: { 'x-trace-id': 'trace-123' },
+            body: { success: false, code: 2009, msg: 'command rejected' },
+          },
+        },
+      ]),
+    );
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    fixture.detectChanges();
+
+    await component.callLink(link);
+    fixture.detectChanges();
+
+    const diagnostics = fixture.nativeElement.querySelector('.request-diagnostics pre').textContent;
+    expect(JSON.parse(diagnostics).exchanges[0].request.body).toBe(command);
+    expect(diagnostics).toContain('access_token');
+    expect(diagnostics).toContain('trace-123');
+    expect(diagnostics).toContain('command rejected');
+    fixture.nativeElement.querySelector('.request-diagnostics button').click();
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(diagnostics));
+    await vi.waitFor(() => expect(component.requestState(link.id)?.copyMessage).toContain('Diagnostica copiata'));
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.request-diagnostics [role="status"]').textContent).toContain(
+      'copiata',
+    );
   });
 
   it('highlights a tapped link yellow while its request is in progress', async () => {
@@ -216,6 +337,7 @@ describe('HomePage', () => {
 
   it('clears successful and failed link highlights after five seconds', async () => {
     vi.useFakeTimers();
+    TestBed.inject(DetailedDiagnosticsSettingsService).setEnabled(false);
     const linkStore = TestBed.inject(LinkStore);
     const successLink = { id: 'success', name: 'Success', url: 'https://success.example' };
     const errorLink = { id: 'error', name: 'Error', url: 'https://error.example' };
@@ -286,6 +408,11 @@ describe('HomePage', () => {
     expect(fetchMock).toHaveBeenCalledWith(link.url, expect.objectContaining({ method: 'GET', mode: 'no-cors' }));
     expect(component.requestState(link.id)?.status).toBe('unverified');
     expect(component.requestState(link.id)?.message).toContain('codice HTTP non è leggibile');
+    const diagnostics = JSON.parse(component.requestState(link.id)?.diagnostics ?? '{}');
+    expect(diagnostics.exchanges[0]).toMatchObject({
+      request: { method: 'GET', mode: 'no-cors' },
+      response: { status: 0, type: 'opaque', body: null },
+    });
   });
 
   it('marks a non-2xx response as an error', async () => {
@@ -300,6 +427,10 @@ describe('HomePage', () => {
 
     expect(component.requestState(link.id)?.status).toBe('error');
     expect(component.requestState(link.id)?.message).toContain('503');
+    expect(JSON.parse(component.requestState(link.id)?.diagnostics ?? '{}').exchanges[0].response).toMatchObject({
+      status: 503,
+      body: 'unavailable',
+    });
   });
 
   it('marks a request without a response as a timeout and cancels it', async () => {

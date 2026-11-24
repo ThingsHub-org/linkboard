@@ -11,7 +11,7 @@ Il backup JSON è versionato e include gli identificativi stabili dei link. Ogni
 ```json
 {
   "format": "linkboard-backup",
-  "version": 1,
+  "version": 2,
   "exportedAt": "2026-11-02T00:00:00.000Z",
   "links": [
     {
@@ -23,7 +23,7 @@ Il backup JSON è versionato e include gli identificativi stabili dei link. Ogni
 }
 ```
 
-Il servizio rifiuta JSON malformato, formati/versioni non supportati, date non valide, ID vuoti o duplicati, nomi vuoti, URL diversi da HTTP(S), immagini non valide e file oltre 10 MB. I campi aggiuntivi non riconosciuti vengono ignorati.
+Il servizio esporta la versione 2 e importa le versioni 1 e 2. I campi aggiuntivi non riconosciuti vengono ignorati. Il servizio rifiuta JSON malformato, formati/versioni non supportati, date non valide, ID vuoti o duplicati, nomi vuoti, URL diversi da HTTP(S), immagini non valide e file oltre 10 MB.
 
 ## Importazione
 
@@ -32,7 +32,7 @@ La pagina Configurazione mostra il numero di link nel file e richiede conferma e
 - **Unisci:** aggiunge i link nuovi e aggiorna quelli che hanno lo stesso ID. Se il backup contiene un'immagine, sostituisce quella locale; se non la contiene, conserva l'immagine locale esistente.
 - **Sostituisci:** rimpiazza tutta la raccolta e importa le immagini presenti nel backup; le immagini locali assenti dal file vengono rimosse.
 
-L'importazione passa da `LinkBackupService` e `LinkStore`, quindi usa il `LINK_REPOSITORY` configurato (localStorage o REST) e attende l'esito della persistenza. In caso di errore di salvataggio, lo store ripristina lo stato precedente e la UI mostra l'errore.
+L'importazione passa da `LinkBackupService` e `LinkStore`, quindi usa il `LINK_REPOSITORY` configurato (localStorage o REST) e attende l'esito della persistenza. In caso di errore di salvataggio, lo store ripristina lo stato precedente e la UI mostra l'errore. La preferenza diagnostica resta indipendente dal backup.
 
 ## Identificativi e NFC
 

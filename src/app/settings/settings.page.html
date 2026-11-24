@@ -12,6 +12,31 @@
   <main class="page-shell settings-page">
     <section class="settings-intro"></section>
 
+    <section class="backup-panel diagnostics-panel" aria-labelledby="diagnostics-title">
+      <div>
+        <p class="eyebrow">DEBUG</p>
+        <h2 id="diagnostics-title">Diagnostica dettagliata delle chiamate</h2>
+      </div>
+      <label class="diagnostics-toggle">
+        <input
+          type="checkbox"
+          name="detailedDiagnostics"
+          [ngModel]="detailedDiagnosticsEnabled()"
+          [ngModelOptions]="{ standalone: true }"
+          (ngModelChange)="setDetailedDiagnosticsEnabled($event)"
+        />
+        <span>Abilita diagnostica dettagliata per tutte le chiamate</span>
+      </label>
+      <p class="diagnostics-warning">
+        Quando attiva mostra richiesta e risposta HTTP complete per tutte le chiamate e permette di copiarle. Nel
+        browser CORS può limitare i dati disponibili. Body e header possono contenere dati privati; le chiamate Tuya
+        includono token e firme. Non condividere la diagnostica.
+      </p>
+      @if (diagnosticsPersistenceError()) {
+      <p class="form-error" role="alert">{{ diagnosticsPersistenceError() }}</p>
+      }
+    </section>
+
     <section class="backup-panel" aria-labelledby="backup-title">
       <div>
         <p class="eyebrow">TRASFERIMENTO</p>

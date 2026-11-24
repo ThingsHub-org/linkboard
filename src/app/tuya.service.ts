@@ -2,8 +2,10 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom, TimeoutError, timeout } from 'rxjs';
 
+import { DetailedDiagnosticsSettingsService } from './detailed-diagnostics-settings.service';
 import type { TuyaLink } from './link.repository';
 import { NativeNfcLaunchService } from './native-nfc-launch.service';
+import type { RequestDiagnosticExchange } from './request-diagnostics.types';
 import { TUYA_REGIONS } from './tuya.types';
 
 interface TuyaEnvelope {
@@ -14,11 +16,19 @@ interface TuyaEnvelope {
 
 interface HttpResult {
   status: number;
+  statusText?: string;
+  url?: string | null;
+  headers: Record<string, string>;
   body: unknown;
 }
 
 export class TuyaRequestError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  constructor(
+    message: string,
+    options?: ErrorOptions,
+    readonly command?: string,
+    readonly diagnostics?: RequestDiagnosticExchange[],
+  ) {
     super(message, options);
     this.name = 'TuyaRequestError';
   }
@@ -28,13 +38,43 @@ export class TuyaRequestError extends Error {
 export class TuyaService {
   private readonly http = inject(HttpClient);
   private readonly nativeHttp = inject(NativeNfcLaunchService);
+  private readonly diagnosticsSettings = inject(DetailedDiagnosticsSettingsService);
 
-  async execute(link: TuyaLink, timeoutMs: number): Promise<void> {
+  async execute(link: TuyaLink, timeoutMs: number): Promise<RequestDiagnosticExchange[] | undefined> {
+    const diagnostics = this.diagnosticsSettings.enabled() ? [] : undefined;
+    try {
+      await this.executeRequests(link, timeoutMs, diagnostics);
+      return diagnostics;
+    } catch (error) {
+      if (error instanceof TuyaRequestError) {
+        throw new TuyaRequestError(error.message, { cause: error }, error.command, diagnostics);
+      }
+      throw new TuyaRequestError(
+        error instanceof Error ? error.message : 'Chiamata Tuya non riuscita.',
+        { cause: error },
+        undefined,
+        diagnostics,
+      );
+    }
+  }
+
+  private async executeRequests(
+    link: TuyaLink,
+    timeoutMs: number,
+    diagnostics: RequestDiagnosticExchange[] | undefined,
+  ): Promise<void> {
     const config = link.tuya;
     const baseUrl = TUYA_REGIONS[config.region].baseUrl;
     const tokenPath = '/v1.0/token?grant_type=1';
     const tokenHeaders = await this.createHeaders(config.clientId, config.clientSecret, 'GET', tokenPath, '');
-    const tokenResponse = await this.request(`${baseUrl}${tokenPath}`, 'GET', tokenHeaders, undefined, timeoutMs);
+    const tokenResponse = await this.request(
+      `${baseUrl}${tokenPath}`,
+      'GET',
+      tokenHeaders,
+      undefined,
+      timeoutMs,
+      diagnostics,
+    );
 
     if (tokenResponse.status < 200 || tokenResponse.status >= 300) {
       throw new TuyaRequestError(`Autenticazione Tuya non riuscita: HTTP ${tokenResponse.status}.`);
@@ -67,6 +107,7 @@ export class TuyaService {
       commandHeaders,
       config.body,
       timeoutMs,
+      diagnostics,
     );
 
     if (commandResponse.status < 200 || commandResponse.status >= 300) {
@@ -76,7 +117,7 @@ export class TuyaService {
       throw new TuyaRequestError('La risposta del servizio Tuya non è valida.');
     }
     if (!commandResponse.body.success) {
-      throw new TuyaRequestError('Tuya ha rifiutato il comando.');
+      throw new TuyaRequestError('Tuya ha rifiutato il comando.', undefined, config.body);
     }
   }
 
@@ -112,24 +153,85 @@ export class TuyaService {
     headers: Record<string, string>,
     body: string | undefined,
     timeoutMs: number,
+    diagnostics: RequestDiagnosticExchange[] | undefined,
   ): Promise<HttpResult> {
+    const exchange: RequestDiagnosticExchange | undefined = diagnostics
+      ? {
+          request: {
+            method,
+            url,
+            headers: { ...headers },
+            ...(body === undefined ? {} : { body }),
+          },
+        }
+      : undefined;
+    if (exchange) diagnostics?.push(exchange);
+
     try {
       if (this.nativeHttp.isAndroidApp) {
         const response = await this.nativeHttp.httpRequest(url, method, headers, body, timeoutMs);
-        return { status: response.status, body: response.data };
+        const result = {
+          status: response.status,
+          headers: response.headers,
+          url: response.url,
+          body: response.data,
+        };
+        if (exchange) exchange.response = result;
+        return result;
       }
 
-      const response = await firstValueFrom(
-        this.http
-          .request<unknown>(method, url, {
-            headers,
-            body,
-            observe: 'response',
-          })
-          .pipe(timeout({ first: timeoutMs })),
-      );
-      return { status: response.status, body: response.body };
+      try {
+        const response = await firstValueFrom(
+          this.http
+            .request<unknown>(method, url, {
+              headers,
+              body,
+              observe: 'response',
+            })
+            .pipe(timeout({ first: timeoutMs })),
+        );
+        const result = {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          headers: toRecord(
+            response.headers
+              .keys()
+              .map((key): [string, string] => [key, response.headers.getAll(key)?.join(', ') ?? '']),
+          ),
+          body: response.body,
+        };
+        if (exchange) exchange.response = result;
+        return result;
+      } catch (error) {
+        if (!(error instanceof HttpErrorResponse) || error.status === 0) throw error;
+        const result = {
+          status: error.status,
+          statusText: error.statusText,
+          url: error.url,
+          headers: toRecord(
+            error.headers.keys().map((key): [string, string] => [key, error.headers.getAll(key)?.join(', ') ?? '']),
+          ),
+          body: error.error,
+        };
+        if (exchange) exchange.response = result;
+        return result;
+      }
     } catch (error) {
+      if (exchange) {
+        exchange.failure = error instanceof Error ? error.message : String(error);
+        if (error instanceof HttpErrorResponse) {
+          exchange.response = {
+            status: error.status,
+            statusText: error.statusText,
+            url: error.url,
+            headers: toRecord(
+              error.headers.keys().map((key): [string, string] => [key, error.headers.getAll(key)?.join(', ') ?? '']),
+            ),
+            body: error.error,
+          };
+        }
+      }
       if (error instanceof TuyaRequestError) throw error;
       if (error instanceof TimeoutError) {
         throw new TuyaRequestError(`Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta Tuya.`);
@@ -160,6 +262,10 @@ function isTuyaEnvelope(value: unknown): value is TuyaEnvelope {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function toRecord(entries: [string, string][]): Record<string, string> {
+  return Object.fromEntries(entries);
 }
 
 async function sha256Hex(value: string): Promise<string> {

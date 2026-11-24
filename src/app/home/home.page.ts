@@ -1,5 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import type { HttpHeaders } from '@angular/common/http';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
@@ -19,15 +20,20 @@ import {
 } from 'ionicons/icons';
 import { filter, firstValueFrom, take, TimeoutError, timeout } from 'rxjs';
 
+import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
 import { LinkStore } from '../link.store';
 import { NativeNfcLaunchService } from '../native-nfc-launch.service';
-import { TuyaService } from '../tuya.service';
+import type { NativeHttpResponse } from '../native-nfc-launch.service';
+import type { RequestDiagnosticExchange } from '../request-diagnostics.types';
+import { TuyaRequestError, TuyaService } from '../tuya.service';
 
 interface CallState {
   status: 'loading' | 'success' | 'unverified' | 'error';
   message: string;
+  diagnostics?: string;
+  copyMessage?: string;
 }
 
 const callResultDisplayDurationMs = 5000;
@@ -45,6 +51,8 @@ export class HomePage implements OnInit {
   private readonly nfc = inject(LinkNfcService);
   private readonly nativeNfc = inject(NativeNfcLaunchService);
   private readonly tuya = inject(TuyaService);
+  private readonly diagnosticsSettings = inject(DetailedDiagnosticsSettingsService);
+  readonly detailedDiagnosticsEnabled = this.diagnosticsSettings.enabled;
   private readonly linksLoaded = firstValueFrom(
     toObservable(this.linkStore.isLoading).pipe(
       filter((isLoading) => !isLoading),
@@ -121,6 +129,7 @@ export class HomePage implements OnInit {
   async callLink(link: SavedLink, timeoutMs = 15000): Promise<void> {
     if (this.callStates()[link.id]?.status === 'loading') return;
     const isTuyaLink = link.type === 'tuya';
+    const diagnosticsEnabled = this.diagnosticsSettings.enabled();
     this.setCallState(link.id, {
       status: 'loading',
       message: isTuyaLink ? 'Autenticazione e invio comando Tuya...' : 'Invio richiesta GET...',
@@ -130,52 +139,142 @@ export class HomePage implements OnInit {
       return;
     }
     if (this.isNativeAndroidApp) {
-      await this.callNativeHttpLink(link, timeoutMs);
+      await this.callNativeHttpLink(link, timeoutMs, diagnosticsEnabled);
       return;
     }
     if (this.isPrivateHttpUrl(link.url)) {
-      await this.callPrivateHttpLink(link, timeoutMs);
+      await this.callPrivateHttpLink(link, timeoutMs, diagnosticsEnabled);
       return;
     }
 
+    const exchange = diagnosticsEnabled ? createGetDiagnostic(link.url) : undefined;
     try {
       const response = await firstValueFrom(
         this.http.get(link.url, { observe: 'response', responseType: 'text' }).pipe(timeout({ first: timeoutMs })),
       );
       const succeeded = response.status >= 200 && response.status < 300;
+      if (exchange) {
+        exchange.response = {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          headers: httpHeadersToRecord(response.headers),
+          body: response.body,
+        };
+      }
+      const message = succeeded
+        ? `Risposta HTTP ${response.status}: chiamata riuscita.`
+        : `Risposta HTTP ${response.status}.`;
       this.setCallState(link.id, {
         status: succeeded ? 'success' : 'error',
-        message: succeeded
-          ? `Risposta HTTP ${response.status}: chiamata riuscita.`
-          : `Risposta HTTP ${response.status}.`,
+        message,
+        ...this.diagnosticsState(message, exchange),
       });
     } catch (error) {
       const status = error instanceof HttpErrorResponse ? error.status : 0;
+      if (exchange) {
+        exchange.failure = error instanceof Error ? error.message : String(error);
+        if (error instanceof HttpErrorResponse) {
+          exchange.response = {
+            status: error.status,
+            statusText: error.statusText,
+            url: error.url,
+            headers: httpHeadersToRecord(error.headers),
+            body: error.error,
+          };
+        }
+      }
       const message = status
         ? `Chiamata non riuscita: HTTP ${status}.`
         : error instanceof TimeoutError
           ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
           : 'Richiesta bloccata o non raggiungibile: verifica rete e CORS.';
-      this.setCallState(link.id, { status: 'error', message });
+      this.setCallState(link.id, {
+        status: 'error',
+        message,
+        ...this.diagnosticsState(message, exchange),
+      });
     }
   }
 
   private async callTuyaLink(link: Extract<SavedLink, { type: 'tuya' }>, timeoutMs: number): Promise<void> {
     try {
-      await this.tuya.execute(link, timeoutMs);
+      const exchanges = await this.tuya.execute(link, timeoutMs);
+      const message = 'Comando Tuya ricevuto; lo stato fisico del dispositivo non è verificato.';
       this.setCallState(link.id, {
         status: 'success',
-        message: 'Comando Tuya ricevuto; lo stato fisico del dispositivo non è verificato.',
+        message,
+        ...(exchanges?.length ? { diagnostics: this.formatDiagnostics(message, exchanges) } : {}),
       });
     } catch (error) {
       this.setCallState(link.id, {
         status: 'error',
         message: error instanceof Error ? error.message : 'Chiamata Tuya non riuscita.',
+        ...(error instanceof TuyaRequestError && error.diagnostics?.length
+          ? { diagnostics: this.formatDiagnostics(error.message, error.diagnostics) }
+          : {}),
       });
     }
   }
 
-  private async callNativeHttpLink(link: SavedLink, timeoutMs: number): Promise<void> {
+  async copyDiagnostics(id: string, diagnostics: string): Promise<void> {
+    let copied = await this.copyDiagnosticsToClipboard(diagnostics);
+    if (!copied) copied = this.copyDiagnosticsFallback(diagnostics);
+
+    this.callStates.update((current) => {
+      const state = current[id];
+      return state
+        ? {
+            ...current,
+            [id]: {
+              ...state,
+              copyMessage: copied
+                ? 'Diagnostica copiata.'
+                : 'Copia automatica non riuscita: seleziona il testo e copialo.',
+            },
+          }
+        : current;
+    });
+  }
+
+  private async copyDiagnosticsToClipboard(diagnostics: string): Promise<boolean> {
+    try {
+      const clipboard = this.document.defaultView?.navigator.clipboard;
+      if (!clipboard?.writeText) return false;
+      await clipboard.writeText(diagnostics);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private copyDiagnosticsFallback(diagnostics: string): boolean {
+    const textarea = this.document.createElement('textarea');
+    textarea.value = diagnostics;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    try {
+      this.document.body.append(textarea);
+      textarea.select();
+      return this.document.execCommand('copy');
+    } catch {
+      return false;
+    } finally {
+      textarea.remove();
+    }
+  }
+
+  private diagnosticsState(message: string, exchange: RequestDiagnosticExchange | undefined): { diagnostics?: string } {
+    return exchange ? { diagnostics: this.formatDiagnostics(message, [exchange]) } : {};
+  }
+
+  private formatDiagnostics(message: string, exchanges: RequestDiagnosticExchange[]): string {
+    return JSON.stringify({ message, exchanges }, null, 2);
+  }
+
+  private async callNativeHttpLink(link: SavedLink, timeoutMs: number, diagnosticsEnabled: boolean): Promise<void> {
+    const exchange = diagnosticsEnabled ? createGetDiagnostic(link.url) : undefined;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => reject(new TimeoutError()), timeoutMs);
@@ -184,24 +283,34 @@ export class HomePage implements OnInit {
     try {
       const response = await Promise.race([this.nativeNfc.httpGet(link.url, timeoutMs), timeoutPromise]);
       const succeeded = response.status >= 200 && response.status < 300;
+      if (exchange) exchange.response = nativeDiagnosticResponse(response);
+      const message = succeeded
+        ? `Risposta HTTP ${response.status}: chiamata riuscita.`
+        : `Risposta HTTP ${response.status}.`;
       this.setCallState(link.id, {
         status: succeeded ? 'success' : 'error',
-        message: succeeded
-          ? `Risposta HTTP ${response.status}: chiamata riuscita.`
-          : `Risposta HTTP ${response.status}.`,
+        message,
+        ...this.diagnosticsState(message, exchange),
       });
     } catch (error) {
       const status =
         typeof error === 'object' && error !== null && 'status' in error
           ? Number((error as { status?: unknown }).status)
           : 0;
+      if (exchange) {
+        exchange.failure = error instanceof Error ? error.message : String(error);
+        const response = nativeErrorDiagnosticResponse(error);
+        if (response) exchange.response = response;
+      }
+      const message = status
+        ? `Chiamata non riuscita: HTTP ${status}.`
+        : error instanceof TimeoutError
+          ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
+          : 'Richiesta bloccata o non raggiungibile: verifica rete e configurazione Android.';
       this.setCallState(link.id, {
         status: 'error',
-        message: status
-          ? `Chiamata non riuscita: HTTP ${status}.`
-          : error instanceof TimeoutError
-            ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
-            : 'Richiesta bloccata o non raggiungibile: verifica rete e configurazione Android.',
+        message,
+        ...this.diagnosticsState(message, exchange),
       });
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
@@ -212,7 +321,11 @@ export class HomePage implements OnInit {
     return this.nativeNfc.isAndroidApp;
   }
 
-  private async callPrivateHttpLink(link: SavedLink, timeoutMs: number): Promise<void> {
+  private async callPrivateHttpLink(link: SavedLink, timeoutMs: number, diagnosticsEnabled: boolean): Promise<void> {
+    const exchange = diagnosticsEnabled
+      ? createGetDiagnostic(link.url, 'Richiesta inviata in modalità no-cors.')
+      : undefined;
+    if (exchange) exchange.request.mode = 'no-cors';
     const controller = new AbortController();
     let timedOut = false;
     const timeoutId = setTimeout(() => {
@@ -227,26 +340,55 @@ export class HomePage implements OnInit {
         signal: controller.signal,
       });
       if (response.type === 'opaque') {
+        const message = 'Risposta ricevuta, ma il codice HTTP non è leggibile per CORS.';
+        if (exchange) {
+          exchange.failure = 'Il browser non espone status, header o body per una risposta opaque no-cors.';
+          exchange.response = {
+            status: 0,
+            statusText: 'Opaque response',
+            url: response.url || link.url,
+            headers: {},
+            body: null,
+            type: response.type,
+          };
+        }
         this.setCallState(link.id, {
           status: 'unverified',
-          message: 'Risposta ricevuta, ma il codice HTTP non è leggibile per CORS.',
+          message,
+          ...this.diagnosticsState(message, exchange),
         });
         return;
       }
 
       const succeeded = response.status >= 200 && response.status < 300;
+      const body = await response.text();
+      if (exchange) {
+        exchange.response = {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          headers: responseHeadersToRecord(response.headers),
+          body,
+          type: response.type,
+        };
+      }
+      const message = succeeded
+        ? `Risposta HTTP ${response.status}: chiamata riuscita.`
+        : `Risposta HTTP ${response.status}.`;
       this.setCallState(link.id, {
         status: succeeded ? 'success' : 'error',
-        message: succeeded
-          ? `Risposta HTTP ${response.status}: chiamata riuscita.`
-          : `Risposta HTTP ${response.status}.`,
+        message,
+        ...this.diagnosticsState(message, exchange),
       });
-    } catch {
+    } catch (error) {
+      if (exchange) exchange.failure = error instanceof Error ? error.message : String(error);
+      const message = timedOut
+        ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
+        : 'Richiesta non riuscita: verifica rete e dispositivo.';
       this.setCallState(link.id, {
         status: 'error',
-        message: timedOut
-          ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
-          : 'Richiesta non riuscita: verifica rete e dispositivo.',
+        message,
+        ...this.diagnosticsState(message, exchange),
       });
     } finally {
       clearTimeout(timeoutId);
@@ -347,7 +489,11 @@ export class HomePage implements OnInit {
     this.callStates.update((current) => ({ ...current, [id]: state }));
 
     if (state.status === 'loading') this.scrollCallResultIntoView(id);
-    if (state.status !== 'success' && state.status !== 'error') return;
+    if (state.diagnostics) {
+      this.scrollCallResultIntoView(id);
+      return;
+    }
+    if (state.status !== 'success' && state.status !== 'error' && !state.diagnostics) return;
 
     this.scrollCallResultIntoView(id);
     const timeoutId = setTimeout(() => {
@@ -394,4 +540,61 @@ export class HomePage implements OnInit {
   hostname(url: string): string {
     return new URL(url).hostname.replace(/^www\./, '');
   }
+}
+
+function createGetDiagnostic(url: string, note?: string): RequestDiagnosticExchange {
+  return {
+    request: {
+      method: 'GET',
+      url,
+      headers: {},
+      note: [
+        note,
+        'Nessun header personalizzato impostato da Linkboard; gli header aggiunti automaticamente dal trasporto potrebbero non essere accessibili.',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    },
+  };
+}
+
+function httpHeadersToRecord(headers: HttpHeaders): Record<string, string> {
+  return Object.fromEntries(
+    headers.keys().map((key): [string, string] => [key, headers.getAll(key)?.join(', ') ?? '']),
+  );
+}
+
+function responseHeadersToRecord(headers: Headers): Record<string, string> {
+  return Object.fromEntries(headers.entries());
+}
+
+function nativeDiagnosticResponse(response: NativeHttpResponse): NonNullable<RequestDiagnosticExchange['response']> {
+  return {
+    status: response.status,
+    url: response.url,
+    headers: response.headers,
+    body: response.data,
+  };
+}
+
+function nativeErrorDiagnosticResponse(value: unknown): RequestDiagnosticExchange['response'] | undefined {
+  if (!isRecord(value) || typeof value['status'] !== 'number') return undefined;
+
+  const headers = isRecord(value['headers'])
+    ? Object.fromEntries(
+        Object.entries(value['headers']).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      )
+    : {};
+
+  return {
+    status: value['status'],
+    ...(typeof value['statusText'] === 'string' ? { statusText: value['statusText'] } : {}),
+    ...(typeof value['url'] === 'string' ? { url: value['url'] } : {}),
+    headers,
+    body: value['data'] ?? value['error'] ?? null,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

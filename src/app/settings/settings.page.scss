@@ -12,6 +12,28 @@
   background: rgba(255, 255, 255, 0.62);
 }
 
+.diagnostics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.diagnostics-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+}
+
+.diagnostics-warning {
+  margin: 0;
+  color: #885b2a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .backup-panel h2 {
   margin: 0 0 6px;
   color: var(--ink);

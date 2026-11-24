@@ -30,11 +30,11 @@ Il comando di build compila la web app con la base corretta per Capacitor e sinc
 
 ## Backup, esportazione e importazione
 
-Dalla pagina **Configurazione** puoi esportare i link in un file JSON versionato e importarli scegliendo **Unisci** o **Sostituisci**. Il backup include gli ID, i nomi e gli URL, ma non le immagini né una collezione di associazioni NFC. Il limite di importazione è 1 MB.
+Dalla pagina **Configurazione** puoi esportare i link in un file JSON versionato e importarli scegliendo **Unisci** o **Sostituisci**. Il backup include ID, nomi, URL, immagini, configurazione e credenziali Tuya, oltre alla preferenza per la diagnostica dettagliata; non include associazioni NFC. I backup possono contenere il Client Secret Tuya e vanno trattati come file sensibili. Il limite di importazione ed esportazione è 10 MB.
 
-- **Unisci** aggiunge i nuovi ID e aggiorna quelli già presenti; conserva le immagini locali dei link che corrispondono per ID.
-- **Sostituisci** rimpiazza tutta la raccolta; i link importati non hanno immagini.
-- Dopo l'importazione puoi assegnare immagini specifiche al dispositivo dalla configurazione.
+- **Unisci** aggiunge i nuovi ID e aggiorna quelli già presenti; un'immagine importata sostituisce quella locale, mentre se manca viene conservata l'immagine locale.
+- **Sostituisci** rimpiazza tutta la raccolta con i link e le immagini presenti nel file.
+- La diagnostica dettagliata è attiva per impostazione predefinita e può essere disattivata dalla configurazione; mostra richiesta e risposta HTTP per le chiamate normali e Tuya. I dati copiabili possono essere privati; quelli Tuya possono includere token di accesso e rinnovo e firme. Non condividerli. CORS può limitare i dati disponibili nel browser.
 
 Il file può contenere URL privati: esportalo e importalo solo se ne conosci la provenienza e conservalo come un backup personale. Per trasferire link tra dispositivi o tra `localStorage` e REST, esporta dal repository sorgente e importa dopo aver selezionato il repository di destinazione. L'importazione usa la persistenza configurata nell'app.
 

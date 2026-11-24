@@ -50,6 +50,26 @@
   cursor: default;
 }
 
+.request-diagnostics {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.request-diagnostics pre {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.request-diagnostics .secondary-button {
+  justify-self: start;
+  border: 1px solid var(--line);
+}
+
 @media (min-width: 761px) {
   .nfc-panel {
     display: none;

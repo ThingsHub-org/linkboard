@@ -50,6 +50,9 @@ describe('HomePage native NFC launch', () => {
     const nativeNfc = TestBed.inject(NativeNfcLaunchService);
     const getMock = vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
       status: 200,
+      data: '',
+      headers: {},
+      url: 'https://example.com/open',
     });
     const link = { id: 'nfc-link', name: 'Door', url: 'https://example.com/open' };
     TestBed.inject(LinkStore).replaceAll([link]);
@@ -72,13 +75,18 @@ describe('HomePage native NFC launch', () => {
   });
 
   it('keeps separate link results when native NFC calls complete in different order', async () => {
-    let resolveFirst!: (value: { status: number }) => void;
-    const firstResponse = new Promise<{ status: number }>((resolve) => {
+    let resolveFirst!: (value: { status: number; data: unknown; headers: Record<string, string>; url: string }) => void;
+    const firstResponse = new Promise<{
+      status: number;
+      data: unknown;
+      headers: Record<string, string>;
+      url: string;
+    }>((resolve) => {
       resolveFirst = resolve;
     });
     const nativeNfc = TestBed.inject(NativeNfcLaunchService);
     vi.spyOn(nativeNfc, 'httpGet').mockImplementation((url) =>
-      url.includes('/first') ? firstResponse : Promise.resolve({ status: 200 }),
+      url.includes('/first') ? firstResponse : Promise.resolve({ status: 200, data: '', headers: {}, url }),
     );
     const first = { id: 'first', name: 'First', url: 'https://example.com/first' };
     const second = { id: 'second', name: 'Second', url: 'https://example.com/second' };
@@ -89,7 +97,7 @@ describe('HomePage native NFC launch', () => {
     onTagDetected?.(second.id);
     await vi.waitFor(() => expect(fixture.componentInstance.requestState(second.id)?.status).toBe('success'));
 
-    resolveFirst({ status: 504 });
+    resolveFirst({ status: 504, data: 'gateway timeout', headers: {}, url: first.url });
     await vi.waitFor(() => expect(fixture.componentInstance.requestState(first.id)?.status).toBe('error'));
 
     expect(fixture.componentInstance.requestState(second.id)?.status).toBe('success');
@@ -100,6 +108,9 @@ describe('HomePage native NFC launch', () => {
     const nativeNfc = TestBed.inject(NativeNfcLaunchService);
     vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
       status: 504,
+      data: 'gateway timeout',
+      headers: {},
+      url: 'https://example.com/open',
     });
     const link = { id: 'nfc-link', name: 'Door', url: 'https://example.com/open' };
 

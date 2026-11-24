@@ -29,6 +29,7 @@ describe('LinkBackupService', () => {
     return linkStore.waitForPersistence(revision).then(() => {
       const backup = JSON.parse(backupService.serializeBackup());
 
+      expect(backup).not.toHaveProperty('detailedDiagnosticsEnabled');
       expect(backup).toMatchObject({
         format: 'linkboard-backup',
         version: 2,
@@ -79,6 +80,15 @@ describe('LinkBackupService', () => {
     await linkStore.waitForPersistence(emptyRevision);
     await backupService.importBackup(backup, 'replace');
     expect(linkStore.links()).toEqual(backup.links);
+  });
+
+  it('rejects unsupported backup versions', () => {
+    const version3Backup = backupJson([{ id: 'legacy', name: 'Legacy', url: 'https://legacy.example' }]).replace(
+      '"version":1',
+      '"version":3',
+    );
+
+    expect(() => backupService.parseBackup(version3Backup)).toThrow('Formato o versione del backup non supportati');
   });
 
   it('rejects invalid JSON, duplicate IDs, and oversized backup files', () => {

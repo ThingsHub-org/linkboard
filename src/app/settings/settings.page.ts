@@ -18,6 +18,7 @@ import {
 } from 'ionicons/icons';
 
 import packageJson from '../../../package.json';
+import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import {
   MAX_BACKUP_SIZE_BYTES,
   LinkBackupService,
@@ -43,12 +44,15 @@ export class SettingsPage {
   private readonly linkStore = inject(LinkStore);
   private readonly nfc = inject(LinkNfcService);
   private readonly backup = inject(LinkBackupService);
+  private readonly diagnosticsSettings = inject(DetailedDiagnosticsSettingsService);
   readonly links = this.linkStore.links;
   readonly persistenceError = this.linkStore.persistenceError;
   readonly isLoadingLinks = this.linkStore.isLoading;
   readonly isReady = this.linkStore.isReady;
   readonly appVersion = packageJson.version;
   readonly nfcSupported = this.nfc.isSupported;
+  readonly detailedDiagnosticsEnabled = this.diagnosticsSettings.enabled;
+  readonly diagnosticsPersistenceError = this.diagnosticsSettings.persistenceError;
   editingId: string | null = null;
   formType: 'http' | 'tuya' = 'http';
   formName = '';
@@ -75,6 +79,10 @@ export class SettingsPage {
   readonly backupError = signal('');
   readonly backupMessage = signal('');
   backupImportMode: BackupImportMode = 'merge';
+
+  setDetailedDiagnosticsEnabled(enabled: boolean): void {
+    this.diagnosticsSettings.setEnabled(enabled);
+  }
 
   constructor() {
     addIcons({
