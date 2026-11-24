@@ -26,6 +26,28 @@ describe('LinkStore', () => {
     expect(store.links()).toEqual(savedLinks);
   });
 
+  it('loads persisted Tuya configuration and credentials', async () => {
+    const savedLink = {
+      id: 'tuya',
+      name: 'Lampada',
+      url: 'https://openapi.tuyaeu.com',
+      type: 'tuya',
+      tuya: {
+        region: 'eu',
+        deviceId: 'device-123',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        body: '{"commands":[]}',
+      },
+    };
+    localStorage.setItem('linkboard.links', JSON.stringify([savedLink]));
+
+    const store = TestBed.inject(LinkStore);
+    await waitUntilReady(store);
+
+    expect(store.links()).toEqual([savedLink]);
+  });
+
   it('persists state changes through the repository effect', async () => {
     const store = TestBed.inject(LinkStore);
     await waitUntilReady(store);

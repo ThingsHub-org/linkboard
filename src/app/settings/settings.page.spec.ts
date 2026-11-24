@@ -125,6 +125,49 @@ describe('SettingsPage', () => {
     expect(component.formImageData()).toBeUndefined();
   });
 
+  it('creates a Tuya endpoint with JSON and its regional credentials', () => {
+    component.formType = 'tuya';
+    component.formName = 'Lampada';
+    component.formTuyaRegion = 'eu';
+    component.formTuyaDeviceId = ' device-123 ';
+    component.formTuyaClientId = ' client-id ';
+    component.formTuyaClientSecret = 'client-secret';
+    component.formTuyaBody = '{ "commands": [{"code":"switch_1","value":true}] }';
+
+    component.saveLink();
+
+    expect(linkStore.links()).toEqual([
+      {
+        id: expect.any(String),
+        name: 'Lampada',
+        url: 'https://openapi.tuyaeu.com',
+        type: 'tuya',
+        tuya: {
+          region: 'eu',
+          deviceId: 'device-123',
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+          body: '{ "commands": [{"code":"switch_1","value":true}] }',
+        },
+      },
+    ]);
+    expect(component.formType).toBe('http');
+    expect(component.formTuyaClientSecret).toBe('');
+  });
+
+  it('rejects invalid Tuya JSON without saving the link', () => {
+    component.formType = 'tuya';
+    component.formTuyaDeviceId = 'device-123';
+    component.formTuyaClientId = 'client-id';
+    component.formTuyaClientSecret = 'client-secret';
+    component.formTuyaBody = '{invalid';
+
+    component.saveLink();
+
+    expect(component.formError).toContain('JSON valido');
+    expect(linkStore.links()).toEqual([]);
+  });
+
   it('keeps, replaces, and removes the photo while editing an endpoint', async () => {
     const originalImage = 'data:image/jpeg;base64,b2xk';
     linkStore.save('Dashboard', 'https://dashboard.example.com', undefined, originalImage);

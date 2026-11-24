@@ -71,7 +71,7 @@
             [class.is-success]="requestState(link.id)?.status === 'success'"
             [class.is-error]="requestState(link.id)?.status === 'error'"
             [disabled]="requestState(link.id)?.status === 'loading'"
-            [attr.aria-label]="'Esegui chiamata GET per ' + link.name"
+            [attr.aria-label]="(link.type === 'tuya' ? 'Invia comando Tuya a ' : 'Esegui chiamata GET per ') + link.name"
             (click)="callLink(link)"
           >
             <span class="launcher-icon" [class.has-photo]="link.imageDataUrl">
@@ -83,7 +83,7 @@
             </span>
             <span class="link-name">{{ link.name }}</span>
             <span class="link-host">{{ hostname(link.url) }}</span>
-            <span class="method-tag">GET</span>
+            <span class="method-tag">{{ link.type === 'tuya' ? 'TUYA' : 'GET' }}</span>
           </button>
           @if (filteredLinks.length > 1) {
           <div class="launcher-order" role="group" [attr.aria-label]="'Ordina ' + link.name">

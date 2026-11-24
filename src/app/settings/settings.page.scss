@@ -59,6 +59,42 @@
   font-size: 12px;
 }
 
+.settings-editor .field select,
+.settings-editor .field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--ink);
+  background: #fbfcfa;
+  font: inherit;
+  font-size: 13px;
+}
+
+.settings-editor .field select {
+  min-height: 43px;
+}
+
+.settings-editor .field textarea {
+  resize: vertical;
+  font-family: monospace;
+  line-height: 1.5;
+}
+
+.settings-editor .field select:focus,
+.settings-editor .field textarea:focus {
+  border-color: var(--green);
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(36, 95, 80, 0.1);
+}
+
+.sensitive-data-warning {
+  margin: 0;
+  color: #885b2a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .nfc-tag-actions {
   display: flex;
   flex-wrap: wrap;

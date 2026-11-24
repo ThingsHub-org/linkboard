@@ -2,17 +2,13 @@ import { Injectable, inject } from '@angular/core';
 
 import type { SavedLink } from './link.repository';
 import { LinkStore } from './link.store';
+import { isTuyaConfiguration } from './tuya.types';
 
 export const MAX_BACKUP_SIZE_BYTES = 10 * 1024 * 1024;
 const backupFormat = 'linkboard-backup';
-const backupVersion = 1;
+const backupVersion = 2;
 
-export interface LinkBackupEntry {
-  id: string;
-  name: string;
-  url: string;
-  imageDataUrl?: string;
-}
+export type LinkBackupEntry = SavedLink;
 
 export interface LinkBackup {
   format: typeof backupFormat;
@@ -32,11 +28,9 @@ export class LinkBackupService {
       format: backupFormat,
       version: backupVersion,
       exportedAt: new Date().toISOString(),
-      links: this.linkStore.links().map(({ id, name, url, imageDataUrl }) => ({
-        id,
-        name,
-        url,
-        ...(imageDataUrl ? { imageDataUrl } : {}),
+      links: this.linkStore.links().map((link) => ({
+        ...link,
+        ...(link.imageDataUrl ? { imageDataUrl: link.imageDataUrl } : {}),
       })),
     };
   }
@@ -61,7 +55,11 @@ export class LinkBackupService {
       throw new Error('Il file selezionato non contiene JSON valido.');
     }
 
-    if (!isRecord(value) || value['format'] !== backupFormat || value['version'] !== backupVersion) {
+    if (
+      !isRecord(value) ||
+      value['format'] !== backupFormat ||
+      (value['version'] !== 1 && value['version'] !== backupVersion)
+    ) {
       throw new Error('Formato o versione del backup non supportati.');
     }
     if (typeof value['exportedAt'] !== 'string' || !Number.isFinite(Date.parse(value['exportedAt']))) {
@@ -77,6 +75,8 @@ export class LinkBackupService {
       const name = entry['name'];
       const url = entry['url'];
       const imageDataUrl = entry['imageDataUrl'];
+      const type = entry['type'];
+      const tuya = entry['tuya'];
 
       if (
         typeof id !== 'string' ||
@@ -91,13 +91,22 @@ export class LinkBackupService {
       if (imageDataUrl !== undefined && (typeof imageDataUrl !== 'string' || !isValidImageDataUrl(imageDataUrl))) {
         throw new Error(`Il link ${index + 1} contiene un'immagine di backup non valida.`);
       }
+      if (
+        (type !== undefined && type !== 'http' && type !== 'tuya') ||
+        (type === 'tuya' && !isTuyaConfiguration(tuya)) ||
+        (type !== 'tuya' && tuya !== undefined)
+      ) {
+        throw new Error(`Il link ${index + 1} contiene una configurazione Tuya non valida.`);
+      }
       if (ids.has(id)) throw new Error(`L’ID "${id}" è duplicato nel backup.`);
 
       ids.add(id);
+      const tuyaConfig = type === 'tuya' && isTuyaConfiguration(tuya) ? { type: 'tuya' as const, tuya } : {};
       return {
         id,
         name,
         url,
+        ...tuyaConfig,
         ...(imageDataUrl ? { imageDataUrl } : {}),
       };
     });
@@ -141,12 +150,7 @@ function mergeLinks(currentLinks: SavedLink[], importedLinks: LinkBackupEntry[])
 }
 
 function toSavedLink(link: LinkBackupEntry): SavedLink {
-  return {
-    id: link.id,
-    name: link.name,
-    url: link.url,
-    ...(link.imageDataUrl ? { imageDataUrl: link.imageDataUrl } : {}),
-  };
+  return { ...link };
 }
 
 function isHttpUrl(value: string): boolean {

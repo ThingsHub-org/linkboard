@@ -31,7 +31,7 @@ describe('LinkBackupService', () => {
 
       expect(backup).toMatchObject({
         format: 'linkboard-backup',
-        version: 1,
+        version: 2,
         links: [
           {
             id: linkStore.links()[0].id,
@@ -41,8 +41,44 @@ describe('LinkBackupService', () => {
           },
         ],
       });
+
       expect(backup.links[0]).toHaveProperty('imageDataUrl');
     });
+  });
+
+  it('exports and restores Tuya settings, including the sensitive credentials', async () => {
+    const config = {
+      region: 'eu',
+      deviceId: 'device-123',
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      body: '{"commands":[{"code":"switch_1","value":true}]}',
+    } as const;
+    const revision = linkStore.save('Lampada', 'https://openapi.tuyaeu.com', undefined, undefined, config);
+    expect(revision).toBeGreaterThan(0);
+    expect(linkStore.links()).toHaveLength(1);
+    const savedLink = linkStore.links()[0];
+    TestBed.flushEffects();
+    await linkStore.waitForPersistence(revision);
+
+    const backup = backupService.parseBackup(backupService.serializeBackup());
+    expect(backup.version).toBe(2);
+    expect(backup.links).toEqual([
+      {
+        id: savedLink.id,
+        name: 'Lampada',
+        url: 'https://openapi.tuyaeu.com',
+        type: 'tuya',
+        tuya: config,
+      },
+    ]);
+    expect(backup.links[0].id).toBe(savedLink.id);
+
+    const emptyRevision = linkStore.replaceAll([]);
+    TestBed.flushEffects();
+    await linkStore.waitForPersistence(emptyRevision);
+    await backupService.importBackup(backup, 'replace');
+    expect(linkStore.links()).toEqual(backup.links);
   });
 
   it('rejects invalid JSON, duplicate IDs, and oversized backup files', () => {

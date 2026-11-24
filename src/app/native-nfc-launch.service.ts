@@ -13,6 +13,11 @@ interface NativeNfcPlugin {
   writeTag(options: { linkId: string }): Promise<void>;
 }
 
+export interface NativeHttpResponse {
+  status: number;
+  data: unknown;
+}
+
 const NativeNfc = registerPlugin<NativeNfcPlugin>('NfcLaunch');
 
 @Injectable({ providedIn: 'root' })
@@ -26,6 +31,26 @@ export class NativeNfcLaunchService {
     return CapacitorHttp.get({
       url,
       responseType: 'text',
+      connectTimeout: timeoutMs,
+      readTimeout: timeoutMs,
+    });
+  }
+
+  async httpRequest(
+    url: string,
+    method: 'GET' | 'POST',
+    headers: Record<string, string>,
+    body: string | undefined,
+    timeoutMs: number,
+  ): Promise<NativeHttpResponse> {
+    if (!this.isAndroidApp) throw new Error('Le chiamate native HTTP sono disponibili solo nell’app Android.');
+
+    return CapacitorHttp.request({
+      url,
+      method,
+      headers,
+      ...(body === undefined ? {} : { data: body }),
+      responseType: 'json',
       connectTimeout: timeoutMs,
       readTimeout: timeoutMs,
     });

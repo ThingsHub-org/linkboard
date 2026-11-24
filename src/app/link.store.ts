@@ -5,6 +5,7 @@ import { firstValueFrom, filter, map, merge, take } from 'rxjs';
 
 import { LINK_REPOSITORY } from './link.repository';
 import type { SavedLink } from './link.repository';
+import type { TuyaConfiguration } from './tuya.types';
 
 export const LinkStore = signalStore(
   { providedIn: 'root' },
@@ -34,15 +35,25 @@ export const LinkStore = signalStore(
     };
 
     return {
-      save(name: string, url: string, id?: string, imageDataUrl?: string): number {
+      save(name: string, url: string, id?: string, imageDataUrl?: string, tuya?: TuyaConfiguration): number {
         if (!store.isReady()) return 0;
 
-        const savedLink: SavedLink = {
-          id: id ?? createLinkId(),
-          name,
-          url,
-          ...(imageDataUrl ? { imageDataUrl } : {}),
-        };
+        const linkId = id ?? createLinkId();
+        const savedLink: SavedLink = tuya
+          ? {
+              id: linkId,
+              name,
+              url,
+              type: 'tuya',
+              tuya,
+              ...(imageDataUrl ? { imageDataUrl } : {}),
+            }
+          : {
+              id: linkId,
+              name,
+              url,
+              ...(imageDataUrl ? { imageDataUrl } : {}),
+            };
         const currentLinks = store.links();
         const nextLinks = id
           ? currentLinks.map((link) => (link.id === id ? savedLink : link))

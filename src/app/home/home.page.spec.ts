@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 
 import { LinkNfcService } from '../link-nfc.service';
 import { LinkStore } from '../link.store';
+import { TuyaService } from '../tuya.service';
 
 import { HomePage } from './home.page';
 
@@ -98,6 +99,31 @@ describe('HomePage', () => {
     await request;
 
     expect(component.requestState(link.id)?.status).toBe('success');
+  });
+
+  it('routes Tuya links through the Tuya service and avoids claiming physical state', async () => {
+    const link = {
+      id: 'tuya-link',
+      name: 'Lampada',
+      url: 'https://openapi.tuyaeu.com',
+      type: 'tuya' as const,
+      tuya: {
+        region: 'eu' as const,
+        deviceId: 'device-123',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        body: '{"commands":[]}',
+      },
+    };
+    const execute = vi.spyOn(TestBed.inject(TuyaService), 'execute').mockResolvedValue();
+
+    await component.callLink(link);
+
+    expect(execute).toHaveBeenCalledWith(link, 15000);
+    expect(component.requestState(link.id)).toMatchObject({
+      status: 'success',
+      message: expect.stringContaining('stato fisico del dispositivo non è verificato'),
+    });
   });
 
   it('highlights a tapped link yellow while its request is in progress', async () => {

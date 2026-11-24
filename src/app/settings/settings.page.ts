@@ -27,6 +27,7 @@ import {
 import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
 import { LinkStore } from '../link.store';
+import { isTuyaRegion, TUYA_REGIONS, type TuyaConfiguration, type TuyaRegion } from '../tuya.types';
 
 function formatBackupLimit(): string {
   return `${MAX_BACKUP_SIZE_BYTES / (1024 * 1024)} MB`;
@@ -49,9 +50,20 @@ export class SettingsPage {
   readonly appVersion = packageJson.version;
   readonly nfcSupported = this.nfc.isSupported;
   editingId: string | null = null;
+  formType: 'http' | 'tuya' = 'http';
   formName = '';
   formUrl = '';
+  formTuyaRegion: TuyaRegion = 'us';
+  formTuyaDeviceId = '';
+  formTuyaClientId = '';
+  formTuyaClientSecret = '';
+  formTuyaBody = '{\n  "commands": []\n}';
   formError = '';
+  readonly tuyaRegions = TUYA_REGIONS;
+  readonly tuyaRegionOptions = Object.entries(TUYA_REGIONS).map(([key, value]) => ({
+    key: key as TuyaRegion,
+    ...value,
+  }));
   readonly formImageData = signal<string | undefined>(undefined);
   readonly isProcessingImage = signal(false);
   readonly activeNfcLinkId = signal<string | null>(null);
@@ -78,30 +90,58 @@ export class SettingsPage {
   }
 
   saveLink(): void {
-    const rawUrl = this.formUrl.trim();
-    const hasProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(rawUrl);
+    let url: string;
+    let tuya: TuyaConfiguration | undefined;
+    if (this.formType === 'tuya') {
+      if (!this.formTuyaDeviceId.trim() || !this.formTuyaClientId.trim() || !this.formTuyaClientSecret.trim()) {
+        this.formError = 'Inserisci ID dispositivo, Client ID e Client Secret Tuya.';
+        return;
+      }
+      try {
+        JSON.parse(this.formTuyaBody);
+      } catch {
+        this.formError = 'Il body Tuya deve contenere JSON valido.';
+        return;
+      }
+      if (!isTuyaRegion(this.formTuyaRegion)) {
+        this.formError = 'Seleziona un data center Tuya valido.';
+        return;
+      }
+      url = TUYA_REGIONS[this.formTuyaRegion].baseUrl;
+      tuya = {
+        region: this.formTuyaRegion,
+        deviceId: this.formTuyaDeviceId.trim(),
+        clientId: this.formTuyaClientId.trim(),
+        clientSecret: this.formTuyaClientSecret,
+        body: this.formTuyaBody,
+      };
+    } else {
+      const rawUrl = this.formUrl.trim();
+      const hasProtocol = /^[a-z][a-z\d+.-]*:\/\//i.test(rawUrl);
 
-    if (hasProtocol && !/^https?:\/\//i.test(rawUrl)) {
-      this.formError = 'Sono supportati solo indirizzi http e https.';
-      return;
+      if (hasProtocol && !/^https?:\/\//i.test(rawUrl)) {
+        this.formError = 'Sono supportati solo indirizzi http e https.';
+        return;
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
+      } catch {
+        this.formError = 'Inserisci un indirizzo web valido.';
+        return;
+      }
+
+      if (!parsedUrl.hostname) {
+        this.formError = 'Inserisci un indirizzo web valido.';
+        return;
+      }
+      url = parsedUrl.href;
     }
 
-    let parsedUrl: URL;
+    const name = this.formName.trim() || this.hostname(url);
     try {
-      parsedUrl = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`);
-    } catch {
-      this.formError = 'Inserisci un indirizzo web valido.';
-      return;
-    }
-
-    if (!parsedUrl.hostname) {
-      this.formError = 'Inserisci un indirizzo web valido.';
-      return;
-    }
-
-    const name = this.formName.trim() || this.hostname(parsedUrl.href);
-    try {
-      this.linkStore.save(name, parsedUrl.href, this.editingId ?? undefined, this.formImageData());
+      this.linkStore.save(name, url, this.editingId ?? undefined, this.formImageData(), tuya);
       this.cancelEdit();
     } catch (error) {
       this.formError = error instanceof Error ? error.message : 'Impossibile creare un ID per il link.';
@@ -111,7 +151,13 @@ export class SettingsPage {
   editLink(link: SavedLink): void {
     this.editingId = link.id;
     this.formName = link.name;
-    this.formUrl = link.url;
+    this.formType = link.type === 'tuya' ? 'tuya' : 'http';
+    this.formUrl = link.type === 'tuya' ? '' : link.url;
+    this.formTuyaRegion = link.type === 'tuya' ? link.tuya.region : 'us';
+    this.formTuyaDeviceId = link.type === 'tuya' ? link.tuya.deviceId : '';
+    this.formTuyaClientId = link.type === 'tuya' ? link.tuya.clientId : '';
+    this.formTuyaClientSecret = link.type === 'tuya' ? link.tuya.clientSecret : '';
+    this.formTuyaBody = link.type === 'tuya' ? link.tuya.body : '{\n  "commands": []\n}';
     this.formImageData.set(link.imageDataUrl);
     this.formError = '';
   }
@@ -124,8 +170,14 @@ export class SettingsPage {
 
   cancelEdit(): void {
     this.editingId = null;
+    this.formType = 'http';
     this.formName = '';
     this.formUrl = '';
+    this.formTuyaRegion = 'us';
+    this.formTuyaDeviceId = '';
+    this.formTuyaClientId = '';
+    this.formTuyaClientSecret = '';
+    this.formTuyaBody = '{\n  "commands": []\n}';
     this.formImageData.set(undefined);
     this.isProcessingImage.set(false);
     this.formError = '';
@@ -133,6 +185,14 @@ export class SettingsPage {
 
   hostname(url: string): string {
     return new URL(url).hostname.replace(/^www\./, '');
+  }
+
+  linkEndpoint(link: SavedLink): string {
+    return link.type === 'tuya' ? `${TUYA_REGIONS[link.tuya.region].label} · Tuya` : link.url;
+  }
+
+  backupContainsTuya(backup: LinkBackup): boolean {
+    return backup.links.some((link) => link.type === 'tuya');
   }
 
   async selectImage(event: Event): Promise<void> {
@@ -195,7 +255,11 @@ export class SettingsPage {
   async exportBackup(): Promise<void> {
     this.backupError.set('');
     this.backupMessage.set('');
-    if (!window.confirm('Il backup contiene nomi, URL e ID dei link. Gli URL potrebbero essere privati. Continuare?')) {
+    const hasTuyaSecrets = this.linkStore.links().some((link) => link.type === 'tuya');
+    const backupWarning = hasTuyaSecrets
+      ? 'Il backup contiene nomi, URL, ID dei link e credenziali Tuya, incluso il Client Secret. Il file è sensibile: condividilo solo con persone fidate. Continuare?'
+      : 'Il backup contiene nomi, URL e ID dei link. Gli URL potrebbero essere privati. Continuare?';
+    if (!window.confirm(backupWarning)) {
       return;
     }
 

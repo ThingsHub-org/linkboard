@@ -23,6 +23,7 @@ import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
 import { LinkStore } from '../link.store';
 import { NativeNfcLaunchService } from '../native-nfc-launch.service';
+import { TuyaService } from '../tuya.service';
 
 interface CallState {
   status: 'loading' | 'success' | 'unverified' | 'error';
@@ -43,6 +44,7 @@ export class HomePage implements OnInit {
   private readonly linkStore = inject(LinkStore);
   private readonly nfc = inject(LinkNfcService);
   private readonly nativeNfc = inject(NativeNfcLaunchService);
+  private readonly tuya = inject(TuyaService);
   private readonly linksLoaded = firstValueFrom(
     toObservable(this.linkStore.isLoading).pipe(
       filter((isLoading) => !isLoading),
@@ -118,7 +120,15 @@ export class HomePage implements OnInit {
 
   async callLink(link: SavedLink, timeoutMs = 15000): Promise<void> {
     if (this.callStates()[link.id]?.status === 'loading') return;
-    this.setCallState(link.id, { status: 'loading', message: 'Invio richiesta GET...' });
+    const isTuyaLink = link.type === 'tuya';
+    this.setCallState(link.id, {
+      status: 'loading',
+      message: isTuyaLink ? 'Autenticazione e invio comando Tuya...' : 'Invio richiesta GET...',
+    });
+    if (isTuyaLink) {
+      await this.callTuyaLink(link, timeoutMs);
+      return;
+    }
     if (this.isNativeAndroidApp) {
       await this.callNativeHttpLink(link, timeoutMs);
       return;
@@ -147,6 +157,21 @@ export class HomePage implements OnInit {
           ? `Timeout dopo ${Math.ceil(timeoutMs / 1000)} secondi: nessuna risposta.`
           : 'Richiesta bloccata o non raggiungibile: verifica rete e CORS.';
       this.setCallState(link.id, { status: 'error', message });
+    }
+  }
+
+  private async callTuyaLink(link: Extract<SavedLink, { type: 'tuya' }>, timeoutMs: number): Promise<void> {
+    try {
+      await this.tuya.execute(link, timeoutMs);
+      this.setCallState(link.id, {
+        status: 'success',
+        message: 'Comando Tuya ricevuto; lo stato fisico del dispositivo non è verificato.',
+      });
+    } catch (error) {
+      this.setCallState(link.id, {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Chiamata Tuya non riuscita.',
+      });
     }
   }
 

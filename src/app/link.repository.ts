@@ -2,12 +2,25 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, InjectionToken } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 
-export interface SavedLink {
+import { isTuyaConfiguration, type TuyaConfiguration } from './tuya.types';
+
+interface SavedLinkBase {
   id: string;
   name: string;
   url: string;
   imageDataUrl?: string;
 }
+
+export interface HttpLink extends SavedLinkBase {
+  type?: 'http';
+}
+
+export interface TuyaLink extends SavedLinkBase {
+  type: 'tuya';
+  tuya: TuyaConfiguration;
+}
+
+export type SavedLink = HttpLink | TuyaLink;
 
 export interface LinkRepository {
   load(): Promise<SavedLink[]>;
@@ -66,6 +79,8 @@ function isSavedLink(value: unknown): value is SavedLink {
     return false;
   }
   if (link['imageDataUrl'] !== undefined && typeof link['imageDataUrl'] !== 'string') return false;
+  if (link['type'] === 'tuya' && !isTuyaConfiguration(link['tuya'])) return false;
+  if (link['type'] !== undefined && link['type'] !== 'http' && link['type'] !== 'tuya') return false;
 
   try {
     return ['http:', 'https:'].includes(new URL(link['url']).protocol);

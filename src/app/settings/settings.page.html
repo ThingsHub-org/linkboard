@@ -39,6 +39,12 @@
         <p role="status">
           Il file contiene {{ backup.links.length }} link. Le immagini presenti nel file verranno importate.
         </p>
+        @if (backupContainsTuya(backup)) {
+        <p class="backup-warning">
+          Il backup contiene credenziali Tuya, incluso il Client Secret. È un file sensibile: condividilo solo con
+          persone fidate.
+        </p>
+        }
         <label class="field backup-mode">
           <span>Modalità di importazione</span>
           <select
@@ -92,6 +98,18 @@
 
       <form (ngSubmit)="saveLink()">
         <label class="field">
+          <span>Tipo di collegamento</span>
+          <select
+            name="formType"
+            [(ngModel)]="formType"
+            [ngModelOptions]="{ standalone: true }"
+            [disabled]="!isReady()"
+          >
+            <option value="http">Link normale</option>
+            <option value="tuya">Comando Tuya</option>
+          </select>
+        </label>
+        <label class="field">
           <span>Nome del servizio</span>
           <input
             type="text"
@@ -102,6 +120,7 @@
             maxlength="50"
           />
         </label>
+        @if (formType === 'http') {
         <label class="field">
           <span>URL dell'endpoint</span>
           <input
@@ -114,6 +133,42 @@
             required
           />
         </label>
+        } @else {
+        <label class="field">
+          <span>Data center Tuya</span>
+          <select name="tuyaRegion" [(ngModel)]="formTuyaRegion" [ngModelOptions]="{ standalone: true }" required>
+            @for (region of tuyaRegionOptions; track region.key) {
+            <option [value]="region.key">{{ region.label }} ({{ region.baseUrl }})</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span>ID dispositivo</span>
+          <input type="text" name="tuyaDeviceId" [(ngModel)]="formTuyaDeviceId" autocomplete="off" required />
+        </label>
+        <label class="field">
+          <span>Client ID Tuya</span>
+          <input type="text" name="tuyaClientId" [(ngModel)]="formTuyaClientId" autocomplete="off" required />
+        </label>
+        <label class="field">
+          <span>Client Secret Tuya</span>
+          <input
+            type="password"
+            name="tuyaClientSecret"
+            [(ngModel)]="formTuyaClientSecret"
+            autocomplete="new-password"
+            required
+          />
+        </label>
+        <label class="field">
+          <span>Body JSON del comando</span>
+          <textarea name="tuyaBody" [(ngModel)]="formTuyaBody" rows="6" spellcheck="false" required></textarea>
+        </label>
+        <p class="sensitive-data-warning">
+          Le credenziali sono conservate sul dispositivo e incluse nei backup. L'app non usa un backend: il Client
+          Secret è quindi estraibile da chi può accedere ai dati dell'app.
+        </p>
+        }
         <div class="image-field">
           <span class="field-label">Foto del pulsante</span>
           <label class="image-picker">
@@ -179,7 +234,7 @@
           }
           <div class="config-details">
             <strong>{{ link.name }}</strong>
-            <span>{{ link.url }}</span>
+            <span>{{ linkEndpoint(link) }}</span>
             <div class="nfc-tag-actions">
               <button
                 class="secondary-button nfc-associate-button"
@@ -191,7 +246,7 @@
               </button>
             </div>
           </div>
-          <span class="method-tag">GET</span>
+          <span class="method-tag">{{ link.type === 'tuya' ? 'POST' : 'GET' }}</span>
           <button
             class="icon-button"
             type="button"
