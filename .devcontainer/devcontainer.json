@@ -4,6 +4,9 @@
     "dockerfile": "Dockerfile"
   },
   "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22.22.3"
+    },
     "ghcr.io/devcontainers/features/java:1": {
       "version": "21",
       "jdkDistro": "ms"
@@ -23,12 +26,7 @@
   "postCreateCommand": "bash .devcontainer/setup-android-sdk.sh && npm ci",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "Angular.ng-template",
-        "dbaeumer.vscode-eslint",
-        "esbenp.prettier-vscode",
-        "Webnative.webnative"
-      ]
+      "extensions": ["Angular.ng-template", "dbaeumer.vscode-eslint", "esbenp.prettier-vscode", "Webnative.webnative"]
     }
   }
 }

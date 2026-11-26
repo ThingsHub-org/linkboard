@@ -4,7 +4,7 @@ import { firstValueFrom, TimeoutError, timeout } from 'rxjs';
 
 import { DetailedDiagnosticsSettingsService } from './detailed-diagnostics-settings.service';
 import type { TuyaLink } from './link.repository';
-import { NativeNfcLaunchService } from './native-nfc-launch.service';
+import { NativePlatformService } from './native-platform.service';
 import type { RequestDiagnosticExchange } from './request-diagnostics.types';
 import { TUYA_REGIONS } from './tuya.types';
 
@@ -37,7 +37,7 @@ export class TuyaRequestError extends Error {
 @Injectable({ providedIn: 'root' })
 export class TuyaService {
   private readonly http = inject(HttpClient);
-  private readonly nativeHttp = inject(NativeNfcLaunchService);
+  private readonly nativeHttp = inject(NativePlatformService);
   private readonly diagnosticsSettings = inject(DetailedDiagnosticsSettingsService);
 
   async execute(link: TuyaLink, timeoutMs: number): Promise<RequestDiagnosticExchange[] | undefined> {

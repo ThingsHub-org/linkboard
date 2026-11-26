@@ -6,7 +6,7 @@ import { provideRouter } from '@angular/router';
 import { vi } from 'vitest';
 
 import { LinkStore } from '../link.store';
-import { NativeNfcLaunchService } from '../native-nfc-launch.service';
+import { NativePlatformService } from '../native-platform.service';
 
 import { HomePage } from './home.page';
 
@@ -22,7 +22,7 @@ describe('HomePage native NFC launch', () => {
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
 
-    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const nativeNfc = TestBed.inject(NativePlatformService);
     vi.spyOn(nativeNfc, 'isAndroidApp', 'get').mockReturnValue(true);
     vi.spyOn(nativeNfc, 'isAvailable').mockResolvedValue(true);
     vi.spyOn(nativeNfc, 'listenForTags').mockImplementation(async (listener) => {
@@ -47,7 +47,7 @@ describe('HomePage native NFC launch', () => {
 
   it('calls the configured link when Android dispatches its NFC tag intent', async () => {
     vi.useFakeTimers();
-    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const nativeNfc = TestBed.inject(NativePlatformService);
     const getMock = vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
       status: 200,
       data: '',
@@ -84,7 +84,7 @@ describe('HomePage native NFC launch', () => {
     }>((resolve) => {
       resolveFirst = resolve;
     });
-    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const nativeNfc = TestBed.inject(NativePlatformService);
     vi.spyOn(nativeNfc, 'httpGet').mockImplementation((url) =>
       url.includes('/first') ? firstResponse : Promise.resolve({ status: 200, data: '', headers: {}, url }),
     );
@@ -105,7 +105,7 @@ describe('HomePage native NFC launch', () => {
   });
 
   it('reports a native HTTP 504 response', async () => {
-    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const nativeNfc = TestBed.inject(NativePlatformService);
     vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
       status: 504,
       data: 'gateway timeout',

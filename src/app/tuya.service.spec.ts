@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DetailedDiagnosticsSettingsService } from './detailed-diagnostics-settings.service';
 import type { TuyaLink } from './link.repository';
-import { NativeNfcLaunchService } from './native-nfc-launch.service';
+import { NativePlatformService } from './native-platform.service';
 import { TuyaService } from './tuya.service';
 
 describe('TuyaService', () => {
@@ -19,7 +19,7 @@ describe('TuyaService', () => {
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
     service = TestBed.inject(TuyaService);
     httpTesting = TestBed.inject(HttpTestingController);
-    vi.spyOn(TestBed.inject(NativeNfcLaunchService), 'isAndroidApp', 'get').mockReturnValue(false);
+    vi.spyOn(TestBed.inject(NativePlatformService), 'isAndroidApp', 'get').mockReturnValue(false);
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
     vi.stubGlobal('crypto', webcrypto);
   });

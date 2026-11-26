@@ -24,8 +24,8 @@ import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-sett
 import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
 import { LinkStore } from '../link.store';
-import { NativeNfcLaunchService } from '../native-nfc-launch.service';
-import type { NativeHttpResponse } from '../native-nfc-launch.service';
+import { NativePlatformService } from '../native-platform.service';
+import type { NativeHttpResponse } from '../native-platform.service';
 import type { RequestDiagnosticExchange } from '../request-diagnostics.types';
 import { TuyaRequestError, TuyaService } from '../tuya.service';
 
@@ -49,7 +49,7 @@ export class HomePage implements OnInit {
   private readonly document = inject(DOCUMENT);
   private readonly linkStore = inject(LinkStore);
   private readonly nfc = inject(LinkNfcService);
-  private readonly nativeNfc = inject(NativeNfcLaunchService);
+  private readonly nativeNfc = inject(NativePlatformService);
   private readonly tuya = inject(TuyaService);
   private readonly diagnosticsSettings = inject(DetailedDiagnosticsSettingsService);
   readonly detailedDiagnosticsEnabled = this.diagnosticsSettings.enabled;

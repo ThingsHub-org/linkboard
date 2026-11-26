@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Capacitor } from '@capacitor/core';
 
-import { NativeNfcLaunchService } from './native-nfc-launch.service';
+import { NativePlatformService } from './native-platform.service';
 
 interface NdefRecordLike {
   mediaType?: string;
@@ -27,7 +27,7 @@ interface NfcWindow extends Window {
 @Injectable({ providedIn: 'root' })
 export class LinkNfcService {
   private readonly recordType = 'application/vnd.linkboard.tag';
-  private readonly nativeNfc = new NativeNfcLaunchService();
+  private readonly nativeNfc = new NativePlatformService();
 
   get isSupported(): boolean {
     return (

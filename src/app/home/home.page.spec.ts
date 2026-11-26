@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import { LinkNfcService } from '../link-nfc.service';
 import { LinkStore } from '../link.store';
-import { NativeNfcLaunchService } from '../native-nfc-launch.service';
+import { NativePlatformService } from '../native-platform.service';
 import { TuyaRequestError, TuyaService } from '../tuya.service';
 
 import { HomePage } from './home.page';
@@ -145,7 +145,7 @@ describe('HomePage', () => {
   it('shows Android HTTP response headers and body in detailed diagnostics', async () => {
     const link = { id: 'native', name: 'Native', url: 'https://api.example.com/status' };
     TestBed.inject(LinkStore).replaceAll([link]);
-    const nativeNfc = TestBed.inject(NativeNfcLaunchService);
+    const nativeNfc = TestBed.inject(NativePlatformService);
     vi.spyOn(nativeNfc, 'isAndroidApp', 'get').mockReturnValue(true);
     vi.spyOn(nativeNfc, 'httpGet').mockResolvedValue({
       status: 200,

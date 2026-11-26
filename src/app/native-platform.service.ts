@@ -23,7 +23,7 @@ export interface NativeHttpResponse {
 const NativeNfc = registerPlugin<NativeNfcPlugin>('NfcLaunch');
 
 @Injectable({ providedIn: 'root' })
-export class NativeNfcLaunchService {
+export class NativePlatformService {
   get isAndroidApp(): boolean {
     return Capacitor.getPlatform() === 'android';
   }
