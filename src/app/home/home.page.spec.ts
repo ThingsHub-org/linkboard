@@ -26,6 +26,7 @@ describe('HomePage', () => {
     await TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     }).compileComponents();
+    TestBed.inject(DetailedDiagnosticsSettingsService).setEnabled(true);
     const nfc = TestBed.inject(LinkNfcService);
     vi.spyOn(nfc, 'isSupported', 'get').mockReturnValue(true);
     vi.spyOn(nfc, 'startScanning').mockResolvedValue(vi.fn());

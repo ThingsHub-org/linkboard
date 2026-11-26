@@ -61,18 +61,18 @@ describe('SettingsPage', () => {
     );
   });
 
-  it('defaults detailed diagnostics to enabled and persists the setting across app starts', () => {
+  it('defaults detailed diagnostics to disabled and persists the setting across app starts', () => {
     const checkbox = fixture.nativeElement.querySelector('[name="detailedDiagnostics"]') as HTMLInputElement;
 
-    expect(checkbox.checked).toBe(true);
+    expect(checkbox.checked).toBe(false);
     checkbox.click();
     fixture.detectChanges();
 
-    expect(component.detailedDiagnosticsEnabled()).toBe(false);
-    expect(localStorage.getItem('linkboard.detailedDiagnosticsEnabled')).toBe('false');
+    expect(component.detailedDiagnosticsEnabled()).toBe(true);
+    expect(localStorage.getItem('linkboard.detailedDiagnosticsEnabled')).toBe('true');
 
     TestBed.resetTestingModule();
-    expect(TestBed.inject(DetailedDiagnosticsSettingsService).enabled()).toBe(false);
+    expect(TestBed.inject(DetailedDiagnosticsSettingsService).enabled()).toBe(true);
   });
 
   it('creates and shares a backup file on Android', async () => {

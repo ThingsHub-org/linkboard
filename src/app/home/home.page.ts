@@ -20,6 +20,7 @@ import {
 } from 'ionicons/icons';
 import { filter, firstValueFrom, take, TimeoutError, timeout } from 'rxjs';
 
+import packageJson from '../../../package.json';
 import { DetailedDiagnosticsSettingsService } from '../detailed-diagnostics-settings.service';
 import { LinkNfcService } from '../link-nfc.service';
 import type { SavedLink } from '../link.repository';
@@ -45,6 +46,7 @@ const callResultDisplayDurationMs = 5000;
   imports: [FormsModule, IonContent, IonIcon, RouterLink],
 })
 export class HomePage implements OnInit {
+  readonly appVersion = packageJson.version;
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
   private readonly linkStore = inject(LinkStore);

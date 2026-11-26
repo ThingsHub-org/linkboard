@@ -6,7 +6,7 @@ const persistenceErrorMessage = 'Impossibile salvare la preferenza della diagnos
 
 @Injectable({ providedIn: 'root' })
 export class DetailedDiagnosticsSettingsService {
-  readonly enabled = signal(true);
+  readonly enabled = signal(false);
   readonly persistenceError = signal<string | null>(null);
 
   constructor() {

@@ -17,6 +17,7 @@ describe('TuyaService', () => {
     TestBed.resetTestingModule();
     localStorage.clear();
     TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.inject(DetailedDiagnosticsSettingsService).setEnabled(true);
     service = TestBed.inject(TuyaService);
     httpTesting = TestBed.inject(HttpTestingController);
     vi.spyOn(TestBed.inject(NativePlatformService), 'isAndroidApp', 'get').mockReturnValue(false);
