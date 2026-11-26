@@ -22,11 +22,11 @@ Per compilare il progetto Android servono Android SDK e JDK 21. Il Dev Container
 
 ```bash
 npm install
-npm run android:build
+npm run android:apk
 npm run android:open
 ```
 
-Il comando di build compila la web app con la base corretta per Capacitor e sincronizza gli asset nel progetto `android/`. Da Android Studio puoi avviare l'app su un dispositivo Android con NFC oppure generare un APK. Le prove finali di lettura e scrittura richiedono un telefono e tag NDEF reali.
+`npm run android:apk` compila la web app in modalità production, sincronizza gli asset Capacitor e genera l’APK di debug. `npm run android:build` resta disponibile per preparare solo gli asset e sincronizzare il progetto. Da Android Studio puoi avviare l'app su un dispositivo Android con NFC. Le prove finali di lettura e scrittura richiedono un telefono e tag NDEF reali.
 
 ## Backup, esportazione e importazione
 
@@ -91,23 +91,14 @@ Capacitor è già configurato. Per generare una piattaforma mobile servono l’S
 
 ### Costruire l’APK Android
 
-1. Installa le dipendenze e compila e sincronizza la web app nel progetto Android:
+1. Installa le dipendenze e genera l’APK:
 
 ```bash
 npm install
-npm run android:build
+npm run android:apk
 ```
 
-Il comando `npm run android:build` prepara automaticamente la directory `www/` con la build production e sincronizza il contenuto nel progetto `android/`; non è necessario eseguire separatamente `npm run build`.
-
-2. Genera l’APK di debug dal progetto Android:
-
-```bash
-cd android
-./gradlew assembleDebug
-```
-
-L’APK viene creato in `android/app/build/outputs/apk/debug/app-debug.apk`.
+Il comando usa JDK 21 (configurato nel Dev Container) e compila Gradle con un worker e heap limitato. L’APK viene creato in `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Per generare una build Android release non firmata:
 
