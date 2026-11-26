@@ -275,6 +275,14 @@
           <button
             class="icon-button"
             type="button"
+            [attr.aria-label]="'Duplica ' + link.name"
+            (click)="duplicateLink(link)"
+          >
+            <ion-icon name="copy-outline"></ion-icon>
+          </button>
+          <button
+            class="icon-button"
+            type="button"
             [attr.aria-label]="'Modifica ' + link.name"
             (click)="editLink(link)"
           >

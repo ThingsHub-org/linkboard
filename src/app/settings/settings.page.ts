@@ -10,6 +10,7 @@ import {
   arrowBackOutline,
   checkmarkOutline,
   closeOutline,
+  copyOutline,
   createOutline,
   globeOutline,
   imageOutline,
@@ -89,6 +90,7 @@ export class SettingsPage {
       arrowBackOutline,
       checkmarkOutline,
       closeOutline,
+      copyOutline,
       createOutline,
       globeOutline,
       imageOutline,
@@ -197,6 +199,30 @@ export class SettingsPage {
 
   linkEndpoint(link: SavedLink): string {
     return link.type === 'tuya' ? `${TUYA_REGIONS[link.tuya.region].label} · Tuya` : link.url;
+  }
+
+  duplicateLink(link: SavedLink): void {
+    if (!this.isReady()) return;
+
+    const revision = this.linkStore.save(
+      `${link.name} - copia`,
+      link.url,
+      undefined,
+      link.imageDataUrl,
+      link.type === 'tuya' ? link.tuya : undefined,
+    );
+    if (!revision) return;
+
+    const duplicate = this.linkStore.links().at(-1);
+    if (!duplicate) return;
+
+    this.editLink(duplicate);
+    queueMicrotask(() => {
+      const editor = document.querySelector<HTMLElement>('.settings-editor');
+      if (typeof editor?.scrollIntoView === 'function') {
+        editor.scrollIntoView({ block: 'start' });
+      }
+    });
   }
 
   backupContainsTuya(backup: LinkBackup): boolean {

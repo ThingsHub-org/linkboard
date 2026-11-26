@@ -38,6 +38,23 @@ describe('SettingsPage', () => {
     await vi.waitFor(() => expect(linkStore.isReady()).toBe(true));
   });
 
+  it('duplicates a configured link and opens it for editing', () => {
+    linkStore.save('Dashboard', 'https://dashboard.example.com', undefined, 'data:image/jpeg;base64,b2xk');
+    TestBed.flushEffects();
+    fixture.detectChanges();
+
+    component.duplicateLink(linkStore.links()[0]);
+    TestBed.flushEffects();
+    fixture.detectChanges();
+
+    expect(linkStore.links()).toHaveLength(2);
+    expect(linkStore.links()[1].name).toBe('Dashboard - copia');
+    expect(linkStore.links()[1].url).toBe('https://dashboard.example.com');
+    expect(linkStore.links()[1].imageDataUrl).toBe('data:image/jpeg;base64,b2xk');
+    expect(component.editingId).toBe(linkStore.links()[1].id);
+    expect(component.formName).toBe('Dashboard - copia');
+  });
+
   it('displays the application version from package metadata', () => {
     expect(fixture.nativeElement.querySelector('.page-footer')?.textContent).toContain(
       `Versione ${component.appVersion}`,
