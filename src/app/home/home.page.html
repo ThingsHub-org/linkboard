@@ -128,9 +128,20 @@
           @if (result.diagnostics && detailedDiagnosticsEnabled()) {
           <section class="request-diagnostics" aria-label="Diagnostica dettagliata della chiamata">
             <pre>{{ result.diagnostics }}</pre>
-            <button class="secondary-button" type="button" (click)="copyDiagnostics(link.id, result.diagnostics)">
-              Copia diagnostica
-            </button>
+            <div class="request-diagnostics-actions">
+              <button class="secondary-button" type="button" (click)="copyDiagnostics(link.id, result.diagnostics)">
+                Copia diagnostica
+              </button>
+              <button
+                class="icon-button"
+                type="button"
+                aria-label="Chiudi diagnostica dettagliata"
+                title="Chiudi diagnostica"
+                (click)="closeDiagnostics(link.id)"
+              >
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </div>
             @if (result.copyMessage) {
             <span role="status" aria-live="polite">{{ result.copyMessage }}</span>
             }

@@ -65,9 +65,19 @@
   user-select: text;
 }
 
-.request-diagnostics .secondary-button {
-  justify-self: start;
+.request-diagnostics-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.request-diagnostics-actions .secondary-button {
   border: 1px solid var(--line);
+}
+
+.request-diagnostics-actions .icon-button {
+  width: 36px;
+  height: 36px;
 }
 
 @media (min-width: 761px) {

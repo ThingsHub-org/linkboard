@@ -140,6 +140,12 @@ describe('HomePage', () => {
 
     fixture.nativeElement.querySelector('.request-diagnostics button').click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledWith(diagnostics));
+
+    fixture.nativeElement.querySelector('[aria-label="Chiudi diagnostica dettagliata"]').click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.request-diagnostics')).toBeNull();
+    expect(component.requestState(link.id)).toMatchObject({ status: 'success', diagnostics: undefined });
   });
 
   it('shows Android HTTP response headers and body in detailed diagnostics', async () => {

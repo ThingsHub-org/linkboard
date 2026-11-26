@@ -237,6 +237,13 @@ export class HomePage implements OnInit {
     });
   }
 
+  closeDiagnostics(id: string): void {
+    const state = this.callStates()[id];
+    if (!state?.diagnostics) return;
+
+    this.setCallState(id, { ...state, diagnostics: undefined, copyMessage: undefined });
+  }
+
   private async copyDiagnosticsToClipboard(diagnostics: string): Promise<boolean> {
     try {
       const clipboard = this.document.defaultView?.navigator.clipboard;
