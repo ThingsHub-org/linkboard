@@ -26,7 +26,7 @@ npm run android:apk
 npm run android:open
 ```
 
-`npm run android:apk` compila la web app in modalità production, sincronizza gli asset Capacitor e genera l’APK di debug. `npm run android:build` resta disponibile per preparare solo gli asset e sincronizzare il progetto. Da Android Studio puoi avviare l'app su un dispositivo Android con NFC. Le prove finali di lettura e scrittura richiedono un telefono e tag NDEF reali.
+`npm run android:apk` compila la web app in modalità production, sincronizza gli asset Capacitor e genera l’APK di debug. Ogni build Android incrementa automaticamente `versionCode` e sincronizza `versionName` con la versione dell’app. `npm run android:build` resta disponibile per preparare solo gli asset e sincronizzare il progetto. Da Android Studio puoi avviare l'app su un dispositivo Android con NFC. Le prove finali di lettura e scrittura richiedono un telefono e tag NDEF reali.
 
 ## Backup, esportazione e importazione
 

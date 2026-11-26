@@ -36,7 +36,7 @@ function hasLocalChanges() {
   ]);
 
   for (const file of files) {
-    if (file === 'scripts/bump-version.js') {
+    if (file === 'scripts/bump-version.js' || file === 'android/app/build.gradle') {
       continue;
     }
 
@@ -146,6 +146,25 @@ if (packageJson.version !== version || packageLock.version !== version) {
   packageLock.packages[''].version = version;
   fs.writeFileSync('package.json', `${JSON.stringify(packageJson, null, 2)}\n`);
   fs.writeFileSync('package-lock.json', `${JSON.stringify(packageLock, null, 2)}\n`);
+}
+
+const androidBuildGradlePath = 'android/app/build.gradle';
+const androidBuildGradle = fs.readFileSync(androidBuildGradlePath, 'utf8');
+const versionCodeMatch = androidBuildGradle.match(/^\s*versionCode\s+(\d+)\s*$/m);
+if (!versionCodeMatch) {
+  throw new Error('Cannot determine the Android versionCode.');
+}
+if (!/^\s*versionName\s+"[^"]+"\s*$/m.test(androidBuildGradle)) {
+  throw new Error('Cannot determine the Android versionName.');
+}
+
+const nextAndroidVersionCode = Number(versionCodeMatch[1]) + 1;
+const updatedAndroidBuildGradle = androidBuildGradle
+  .replace(/^\s*versionCode\s+\d+\s*$/m, `        versionCode ${nextAndroidVersionCode}`)
+  .replace(/^\s*versionName\s+"[^"]+"\s*$/m, `        versionName "${version}"`);
+
+if (updatedAndroidBuildGradle !== androidBuildGradle) {
+  fs.writeFileSync(androidBuildGradlePath, updatedAndroidBuildGradle);
 }
 
 console.log(`Versione applicazione: ${version}`);
