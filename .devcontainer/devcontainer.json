@@ -11,8 +11,7 @@
   },
   "containerEnv": {
     "ANDROID_HOME": "/home/vscode/Android/Sdk",
-    "ANDROID_SDK_ROOT": "/home/vscode/Android/Sdk",
-    "PATH": "${containerEnv:PATH}:/home/vscode/Android/Sdk/platform-tools:/home/vscode/Android/Sdk/cmdline-tools/latest/bin"
+    "ANDROID_SDK_ROOT": "/home/vscode/Android/Sdk"
   },
   "forwardPorts": [4200],
   "portsAttributes": {
