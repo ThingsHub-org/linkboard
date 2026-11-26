@@ -274,6 +274,7 @@ export class SettingsPage {
     try {
       const serialized = this.backup.serializeBackup();
       const filename = `linkboard-backup-${new Date().toISOString().replaceAll(':', '-')}.json`;
+      let backupShared = false;
       if (Capacitor.getPlatform() === 'android') {
         const { uri } = await Filesystem.writeFile({
           path: filename,
@@ -287,15 +288,46 @@ export class SettingsPage {
           dialogTitle: 'Salva o condividi il backup',
         });
       } else {
-        const file = new Blob([serialized], { type: 'application/json' });
-        const url = URL.createObjectURL(file);
-        try {
-          const anchor = document.createElement('a');
-          anchor.href = url;
-          anchor.download = filename;
-          anchor.click();
-        } finally {
-          URL.revokeObjectURL(url);
+        let shared = false;
+        const file = new File([serialized], filename, { type: 'application/json' });
+        const webNavigator = navigator as Navigator & {
+          canShare?: (data: ShareData) => boolean;
+          share?: (data: ShareData) => Promise<void>;
+        };
+        const shareData: ShareData = {
+          title: 'Backup Linkboard',
+          files: [file],
+        };
+        if (typeof webNavigator.share === 'function') {
+          let canShare = true;
+          try {
+            canShare = typeof webNavigator.canShare !== 'function' || webNavigator.canShare(shareData);
+          } catch {
+            canShare = false;
+          }
+          if (canShare) {
+            try {
+              await webNavigator.share(shareData);
+              shared = true;
+              backupShared = true;
+            } catch (error) {
+              if (error instanceof DOMException && error.name === 'AbortError') {
+                this.backupMessage.set('Condivisione annullata.');
+                return;
+              }
+            }
+          }
+        }
+        if (!shared) {
+          const url = URL.createObjectURL(file);
+          try {
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = filename;
+            anchor.click();
+          } finally {
+            URL.revokeObjectURL(url);
+          }
         }
       }
       const links = this.linkStore.links();
@@ -309,7 +341,9 @@ export class SettingsPage {
       const exportMessage =
         Capacitor.getPlatform() === 'android'
           ? 'Backup pronto: scegli dove salvarlo o condividerlo.'
-          : 'Backup esportato.';
+          : backupShared
+            ? 'Backup condiviso.'
+            : 'Backup esportato.';
       this.backupMessage.set(`${exportMessage} ${imageMessage}`);
     } catch (error) {
       this.backupError.set(error instanceof Error ? error.message : 'Impossibile esportare il backup.');

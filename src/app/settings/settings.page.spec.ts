@@ -88,6 +88,53 @@ describe('SettingsPage', () => {
     expect(component.backupMessage()).toContain('immagini sono incluse per 1 su 2 link');
   });
 
+  it('shares a backup through the browser Web Share API', async () => {
+    linkStore.save('Web', 'https://web.example.com');
+    const share = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', {
+      canShare: vi.fn().mockReturnValue(true),
+      share,
+    });
+    vi.spyOn(Capacitor, 'getPlatform').mockReturnValue('web');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+
+    await component.exportBackup();
+
+    expect(share).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Backup Linkboard',
+        files: [
+          expect.objectContaining({
+            name: expect.stringMatching(/^linkboard-backup-.*\.json$/),
+            type: 'application/json',
+          }),
+        ],
+      }),
+    );
+    expect(click).not.toHaveBeenCalled();
+  });
+
+  it('downloads the backup in the browser when Web Share is unavailable', async () => {
+    linkStore.save('Web', 'https://web.example.com');
+    vi.stubGlobal('navigator', {
+      canShare: vi.fn().mockReturnValue(false),
+      share: vi.fn(),
+    });
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn().mockReturnValue('blob:backup'),
+      revokeObjectURL: vi.fn(),
+    });
+    vi.spyOn(Capacitor, 'getPlatform').mockReturnValue('web');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+
+    await component.exportBackup();
+
+    expect(click).toHaveBeenCalledOnce();
+    expect(component.backupMessage()).toContain('Backup esportato');
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
