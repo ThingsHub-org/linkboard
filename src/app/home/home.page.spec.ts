@@ -78,6 +78,9 @@ describe('HomePage', () => {
     ]);
     fixture.detectChanges();
 
+    const firstCard = fixture.nativeElement.querySelector('.launcher-card');
+    expect(firstCard.querySelector('.link-host')).toBeNull();
+    expect(firstCard.querySelector('.method-tag')).toBeNull();
     expect(fixture.nativeElement.querySelector('[aria-label="Sposta First prima"]').disabled).toBe(true);
     expect(fixture.nativeElement.querySelector('[aria-label="Sposta Third dopo"]').disabled).toBe(true);
     fixture.nativeElement.querySelector('[aria-label="Sposta Third prima"]').click();

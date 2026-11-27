@@ -43,6 +43,11 @@ describe('SettingsPage', () => {
     TestBed.flushEffects();
     fixture.detectChanges();
 
+    const row = fixture.nativeElement.querySelector('.config-row');
+    expect(row.textContent).toContain('https://dashboard.example.com');
+    expect(row.querySelector('.method-tag')?.textContent.trim()).toBe('GET');
+    expect(row.querySelector('[aria-label="Duplica Dashboard"]')).not.toBeNull();
+
     component.duplicateLink(linkStore.links()[0]);
     TestBed.flushEffects();
     fixture.detectChanges();

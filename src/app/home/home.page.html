@@ -82,8 +82,6 @@
               }
             </span>
             <span class="link-name">{{ link.name }}</span>
-            <span class="link-host">{{ hostname(link.url) }}</span>
-            <span class="method-tag">{{ link.type === 'tuya' ? 'TUYA' : 'GET' }}</span>
           </button>
           @if (filteredLinks.length > 1) {
           <div class="launcher-order" role="group" [attr.aria-label]="'Ordina ' + link.name">

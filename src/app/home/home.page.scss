@@ -36,13 +36,14 @@
 .launcher-order {
   display: flex;
   justify-content: center;
-  gap: 6px;
-  padding: 0 12px 12px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 0 0;
 }
 
 .launcher-order .icon-button {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
 }
 
 .launcher-order .icon-button:disabled {
@@ -51,6 +52,7 @@
 }
 
 .request-diagnostics {
+  grid-column: 1 / -1;
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -78,6 +80,10 @@
 .request-diagnostics-actions .icon-button {
   width: 36px;
   height: 36px;
+}
+
+.call-feedback {
+  grid-column: 1 / -1;
 }
 
 @media (min-width: 761px) {
